@@ -142,3 +142,51 @@ instance/
 .prettierrc
 .eslintrc
 .stylelintrc
+
+# ==================== 补充规则 ====================
+
+# VS Code 工作区文件
+*.code-workspace
+
+# 项目运行日志（FastAPI/Celery 生成）
+*.log
+logs/
+celery_*.log
+uvicorn.log
+
+# Python 虚拟环境（防止误提交）
+venv/
+.venv/
+env/
+env.bak/
+venv.bak/
+
+# 本地开发配置文件
+local_settings.py
+config.ini
+secrets.ini
+
+# 数据库文件（防止提交本地测试数据）
+*.db
+*.sqlite3
+*.db-journal
+instance/
+
+# 临时/测试文件
+*.tmp
+*.temp
+test.db
+test_*.db
+*.bak
+*.backup
+
+# 模型训练中间文件（如果你后续训练模型）
+*.pth
+*.ckpt
+*.onnx
+checkpoints/
+runs/
+
+# 系统文件（防止误提交）
+Thumbs.db
+.DS_Store
