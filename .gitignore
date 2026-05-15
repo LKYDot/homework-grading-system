@@ -2,6 +2,11 @@
 
 # 操作系统文件
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 desktop.ini
 *.swp
@@ -17,6 +22,9 @@ desktop.ini
 .project
 .classpath
 .settings/
+*.sublime-project
+*.sublime-workspace
+.vim/
 
 # Python相关
 __pycache__/
@@ -29,34 +37,45 @@ venv/
 .venv/
 env.local/
 .env.*.local
+.python-version
 
 # 日志文件
 *.log
 logs/
+*.log.*
 
 # 数据库文件
 *.db
 *.sqlite
 *.sqlite3
+*.db-journal
 
 # 配置文件
 .env
 .env.local
 .env.production
 .env.staging
+.env.test
 secrets/
+config.local.py
 
-# 上传文件
+# 上传文件和媒体
 uploads/
 *.tmp
 *.temp
+*.bak
+*.backup
+*.old
+*.orig
 
 # 测试和覆盖报告
 .coverage
+.coverage.*
 htmlcov/
 .pytest_cache/
 .tox/
 .nox/
+.coverage.*
 
 # 构建和分发
 dist/
@@ -64,26 +83,62 @@ build/
 *.egg-info/
 *.whl
 *.egg
+MANIFEST
 
 # Celery
 celerybeat-schedule
+celerybeat.pid
 
 # Jupyter Notebook
 .ipynb_checkpoints
+*.ipynb
 
 # Docker
 docker-compose.override.yml
+docker-compose.local.yml
+.Dockerfile
+docker-compose.override.yaml
 
-# ================ 项目特定规则 ================
-
-# 作业上传文件
-app/uploads/
-uploads/
-
-# 模型文件（如果有）
-models/*.pkl
-models/*.pt
-models/*.h5
+# 虚拟环境（各种工具）
+node_modules/
+.bower_components/
+.pip/
 
 # 缓存文件
 .cache/
+.mypy_cache/
+.pytest_cache/
+.pytype/
+
+# 系统缓存
+*.egg
+*.eggs/
+.installed.cfg
+
+# 版本控制
+.hg/
+.svn/
+CVS/
+
+# ================ 项目特定规则 ================
+
+# 作业上传文件（所有位置）
+**/uploads/
+**/media/
+**/static/uploads/
+
+# 模型文件
+models/*.pkl
+models/*.pt
+models/*.h5
+models/*.joblib
+models/
+
+# SQLite数据库文件
+*.db
+instance/
+
+# 开发工具
+.prettierrc
+.eslintrc
+.stylelintrc
