@@ -1,4 +1,5 @@
 import json
+import re
 from config import settings
 from utils.logger import logger
 from schemas.homework import GradingResult
@@ -38,7 +39,7 @@ class TongyiClient:
             self.model = "mock"
 
     def grade_homework(self, ocr_results: list) -> list:
-        """调用大模型进行作业批改"""
+        """调用大模型进行作业批改（批量）"""
         if not DASHSCOPE_AVAILABLE:
             return self._mock_grade_homework(ocr_results)
             
@@ -60,6 +61,74 @@ class TongyiClient:
         except Exception as e:
             logger.error(f"大模型批改失败: {str(e)}", exc_info=True)
             raise
+
+    def grade_question(
+        self,
+        question_type: str,
+        question_text: str,
+        student_answer: str,
+        standard_answer: str,
+        max_score: float,
+    ) -> GradingResult:
+        """单题智能批改"""
+        if not DASHSCOPE_AVAILABLE:
+            return self._mock_grade_question(
+                question_type, question_text, student_answer, standard_answer, max_score
+            )
+        
+        try:
+            system_prompt = """
+            你是一名中小学作业批改老师，请根据学生的答案进行批改。
+            输出格式必须是JSON，包含：score, max_score, result, comment, analysis。
+            score: 得分（数字）
+            max_score: 满分
+            result: 结果（正确/错误/部分正确）
+            comment: 简短评语
+            analysis: 详细分析
+            """
+            
+            user_prompt = f"""
+            题目类型：{question_type}
+            问题：{question_text}
+            学生答案：{student_answer}
+            标准答案：{standard_answer}
+            满分：{max_score}
+            """
+            
+            messages = [
+                {"role": "system", "content": system_prompt.strip()},
+                {"role": "user", "content": user_prompt.strip()},
+            ]
+            
+            if circuit_breaker:
+                response = circuit_breaker.call(self._call_dashscope, messages=messages)
+            else:
+                response = self._call_dashscope(messages=messages)
+            
+            result = json.loads(response)
+            return GradingResult(
+                question_block_id=0,
+                question_no="",
+                score=result.get("score", 0),
+                max_score=result.get("max_score", max_score),
+                result=result.get("result", "错误"),
+                comment=result.get("comment", ""),
+                analysis=result.get("analysis", ""),
+                confidence=0.8,
+            )
+            
+        except Exception as e:
+            logger.error(f"单题批改失败: {str(e)}")
+            return GradingResult(
+                question_block_id=0,
+                question_no="",
+                score=0,
+                max_score=max_score,
+                result="错误",
+                comment="批改失败，请人工复核",
+                analysis="",
+                confidence=0.0,
+            )
 
     def _call_dashscope(self, messages: list) -> dict:
         """调用通义千问API"""
@@ -86,23 +155,23 @@ class TongyiClient:
         )
 
         system_prompt = """
-你是一名中小学作业批改老师，请根据学生的答案进行批改。
-输出格式必须是JSON数组，每个元素包含：question_no, score, max_score, result, comment, analysis。
-question_no: 题目编号
-score: 得分（数字）
-max_score: 满分（默认10分）
-result: 结果（正确/错误/部分正确）
-comment: 简短评语
-analysis: 详细分析（可选）
-"""
+        你是一名中小学作业批改老师，请根据学生的答案进行批改。
+        输出格式必须是JSON数组，每个元素包含：question_no, score, max_score, result, comment, analysis。
+        question_no: 题目编号
+        score: 得分（数字）
+        max_score: 满分（默认10分）
+        result: 结果（正确/错误/部分正确）
+        comment: 简短评语
+        analysis: 详细分析（可选）
+        """
 
         user_prompt = f"""
-请批改以下作业：
+        请批改以下作业：
 
-{questions_text}
+        {questions_text}
 
-请给出批改结果。
-"""
+        请给出批改结果。
+        """
 
         return [
             {"role": "system", "content": system_prompt.strip()},
@@ -133,14 +202,13 @@ analysis: 详细分析（可选）
             return []
 
     def _mock_grade_homework(self, ocr_results: list) -> list:
-        """Mock大模型批改结果"""
+        """Mock大模型批改结果（批量）"""
         logger.info(f"使用mock模式进行作业批改，共{len(ocr_results)}道题")
         results = []
         for idx, ocr in enumerate(ocr_results):
             question_type = ocr.get("question_type", "计算题")
             student_answer = ocr.get("student_answer", "").strip()
             
-            # 简单的mock逻辑
             if question_type == "计算题":
                 if student_answer == "5" or student_answer == "五":
                     score = 10
@@ -177,6 +245,102 @@ analysis: 详细分析（可选）
                 )
             )
         return results
+
+    def _mock_grade_question(
+        self,
+        question_type: str,
+        question_text: str,
+        student_answer: str,
+        standard_answer: str,
+        max_score: float,
+    ) -> GradingResult:
+        """Mock单题批改"""
+        student_answer = student_answer.strip()
+        standard_answer = standard_answer.strip()
+        
+        if question_type in ["选择题", "判断题"]:
+            if student_answer.upper() == standard_answer.upper():
+                return GradingResult(
+                    question_block_id=0,
+                    question_no="",
+                    score=max_score,
+                    max_score=max_score,
+                    result="正确",
+                    comment="回答正确",
+                    analysis="答案与标准答案一致",
+                    confidence=1.0,
+                )
+            else:
+                return GradingResult(
+                    question_block_id=0,
+                    question_no="",
+                    score=0,
+                    max_score=max_score,
+                    result="错误",
+                    comment=f"正确答案是{standard_answer}",
+                    analysis="答案与标准答案不符",
+                    confidence=1.0,
+                )
+        elif question_type in ["计算题", "口算题"]:
+            try:
+                student_val = float(re.sub(r"[^\d.\-]", "", student_answer))
+                standard_val = float(re.sub(r"[^\d.\-]", "", standard_answer))
+                if abs(student_val - standard_val) < 1e-9:
+                    return GradingResult(
+                        question_block_id=0,
+                        question_no="",
+                        score=max_score,
+                        max_score=max_score,
+                        result="正确",
+                        comment="计算正确",
+                        analysis="计算结果正确",
+                        confidence=1.0,
+                    )
+                elif abs(student_val - standard_val) < max(0.01, abs(standard_val) * 0.01):
+                    return GradingResult(
+                        question_block_id=0,
+                        question_no="",
+                        score=max_score * 0.5,
+                        max_score=max_score,
+                        result="部分正确",
+                        comment="计算结果近似正确",
+                        analysis="计算结果接近标准答案",
+                        confidence=0.9,
+                    )
+            except:
+                pass
+            return GradingResult(
+                question_block_id=0,
+                question_no="",
+                score=0,
+                max_score=max_score,
+                result="错误",
+                comment="计算错误",
+                analysis="计算结果与标准答案不符",
+                confidence=0.8,
+            )
+        else:
+            if student_answer and standard_answer and student_answer == standard_answer:
+                return GradingResult(
+                    question_block_id=0,
+                    question_no="",
+                    score=max_score,
+                    max_score=max_score,
+                    result="正确",
+                    comment="回答正确",
+                    analysis="答案与标准答案一致",
+                    confidence=0.7,
+                )
+            return GradingResult(
+                question_block_id=0,
+                question_no="",
+                score=max_score * 0.5,
+                max_score=max_score,
+                result="部分正确",
+                comment="需要人工复核",
+                analysis="主观题需要人工复核",
+                confidence=0.5,
+            )
 
 
 tongyi_client = TongyiClient()

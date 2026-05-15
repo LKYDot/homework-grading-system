@@ -80,7 +80,10 @@ class TaskService:
             db.add(question_block)
         db.commit()
 
-        for block, question_block in zip(blocks, db.query(QuestionBlock).filter(QuestionBlock.task_id == task_id).all()):
+        for block, question_block in zip(
+            blocks,
+            db.query(QuestionBlock).filter(QuestionBlock.task_id == task_id).all(),
+        ):
             block["id"] = question_block.id
 
     def save_ocr_results(self, db: Session, task_id: str, ocr_results: List[dict]):
@@ -110,7 +113,9 @@ class TaskService:
                 result=result.result,
                 comment=result.comment or "",
                 analysis=result.analysis or "",
-                confidence=Decimal(str(result.confidence)) if result.confidence else None,
+                confidence=(
+                    Decimal(str(result.confidence)) if result.confidence else None
+                ),
             )
             db.add(grading)
         db.commit()

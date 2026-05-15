@@ -2,6 +2,17 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
 
+"""
+BaseModel
+    ├── UserBase           (基础用户信息)
+    │       ├── UserCreate (创建用户)
+    │       └── UserResponse (响应用户信息)
+    │
+    ├── UserUpdate         (更新用户)
+    ├── LoginRequest       (登录请求)
+    └── TokenResponse      (登录响应)
+"""
+
 
 class UserBase(BaseModel):
     username: str

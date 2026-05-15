@@ -6,17 +6,7 @@ from config import settings
 from app.v1 import homework, user, statistics
 from utils.database import create_tables
 from utils.logger import logger
-
-# 延迟导入以避免循环依赖问题
-try:
-    from utils.exceptions import BusinessException
-except ImportError:
-    class BusinessException(Exception):
-        def __init__(self, code: int, message: str):
-            self.code = code
-            self.message = message
-            super().__init__(self.message)
-
+from utils.exceptions import BusinessException
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -26,7 +16,7 @@ app = FastAPI(
     debug=settings.DEBUG,
 )
 
-# 配置CORS
+# 配置CORS---中间件
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -63,13 +53,17 @@ app.include_router(statistics.router, prefix="/api/v1")
 # 健康检查
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "service": settings.APP_NAME, "version": settings.APP_VERSION}
+    return {
+        "status": "ok",
+        "service": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+    }
 
 
 if __name__ == "__main__":
     # 创建数据库表
     create_tables()
-    
+
     uvicorn.run(
         "main:app",
         host=settings.HOST,
