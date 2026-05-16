@@ -5,7 +5,7 @@ celery_app = Celery(
     "homework_tasks",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks.homework_tasks"],
+    include=["tasks.homework_tasks"],
 )
 
 # 配置Celery
@@ -23,5 +23,5 @@ celery_app.conf.update(
 
 # 路由配置
 celery_app.conf.task_routes = {
-    "app.tasks.homework_tasks.process_homework_task": {"queue": "homework"},
+    "tasks.homework_tasks.process_homework_task": {"queue": "homework"},
 }

@@ -11,7 +11,7 @@ import asyncio
 
 
 @celery_app.task(
-    bind=True, max_retries=3, name="app.tasks.homework_tasks.process_homework_task"
+    bind=True, max_retries=3, name="tasks.homework_tasks.process_homework_task"
 )
 def process_homework_task(
     self, task_id: str, image_path: str, subject: str, grade: str, user_id: int
