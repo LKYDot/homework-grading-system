@@ -11,9 +11,15 @@ class User(BaseModel):
     __tablename__ = "user"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, comment="用户名")
-    email: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, comment="邮箱")
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False, comment="密码哈希")
+    username: Mapped[str] = mapped_column(
+        String(50), unique=True, nullable=False, comment="用户名"
+    )
+    email: Mapped[str] = mapped_column(
+        String(100), unique=True, nullable=False, comment="邮箱"
+    )
+    hashed_password: Mapped[str] = mapped_column(
+        String(255), nullable=False, comment="密码哈希"
+    )
     full_name: Mapped[str | None] = mapped_column(String(100), comment="真实姓名")
     role: Mapped[str] = mapped_column(
         String(20),

@@ -14,12 +14,12 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # ==================== 数据库配置 ====================
-    DATABASE_URL: str = "sqlite:///./homework_grading.db"
+    DATABASE_URL: str = "mysql+pymysql://homework_user:homework_password@localhost:3306/homework_db?charset=utf8mb4"
 
     # 数据库连接池配置
-    DB_POOL_SIZE: int = 5
-    DB_MAX_OVERFLOW: int = 10
-    DB_POOL_RECYCLE: int = 300
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 50
+    DB_POOL_RECYCLE: int = 280
     DB_ECHO: bool = False
 
     # ==================== Redis配置 ====================
