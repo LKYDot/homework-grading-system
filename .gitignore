@@ -190,3 +190,10 @@ runs/
 # 系统文件（防止误提交）
 Thumbs.db
 .DS_Store
+
+# Trae IDE 配置
+.trae/
+
+
+tests/
+frontend/

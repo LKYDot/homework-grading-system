@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from utils.database import get_db
-from utils.security import create_access_token, verify_password, get_password_hash
+from utils.security import create_access_token, verify_password, get_password_hash, get_current_user
 from models.user import User
 from schemas.user import UserCreate, UserResponse, LoginRequest, TokenResponse
 from utils.logger import logger
@@ -56,6 +56,8 @@ async def login_user(login: LoginRequest, db: Session = Depends(get_db)):
         user = db.query(User).filter(User.username == login.username).first()
         if not user:
             raise HTTPException(status_code=401, detail="用户名或密码错误")
+        if not user.is_active:
+            raise HTTPException(status_code=401, detail="用户因违规已被禁用")
 
         # 验证密码
         if not verify_password(login.password, user.hashed_password):
@@ -96,3 +98,26 @@ async def get_user(user_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"获取用户信息失败: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="获取用户信息失败")
+
+
+@router.put("/{user_id}/status")
+async def update_user_statue(
+    user_id: int,
+    is_active: bool,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """更新用户状态（管理员功能）"""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    user.is_active = is_active
+    db.commit()
+    db.refresh(user)
+
+    logger.info(f"用户状态更新: {user.username}, is_active={is_active}")
+    return user
