@@ -7,7 +7,6 @@ from schemas.homework import GradingResult
 from utils.logger import logger
 from sqlalchemy.orm import Session
 from utils.database import get_db
-import asyncio
 
 
 @celery_app.task(

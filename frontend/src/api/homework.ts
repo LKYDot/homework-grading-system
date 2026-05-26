@@ -32,9 +32,7 @@ export interface ApiResponse<T> {
 
 export const homeworkApi = {
   upload(formData: FormData) {
-    return client.post<ApiResponse<{ task_id: string }>>('/homework/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    return client.post<ApiResponse<{ task_id: string }>>('/homework/upload', formData)
   },
   getStatus(taskId: string) {
     return client.get<ApiResponse<TaskStatusResponse>>(`/homework/status/${taskId}`)

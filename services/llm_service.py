@@ -1,7 +1,20 @@
-from clients.tongyi_client import tongyi_client
+from clients.tongyi_client import tongyi_client, GradeResult
 from services.rule_engine import rule_engine
 from schemas.homework import GradingResult
 from utils.logger import logger
+
+
+def _to_schema(r: GradeResult) -> GradingResult:
+    return GradingResult(
+        question_block_id=r.question_block_id,
+        question_no=r.question_no,
+        score=r.score,
+        max_score=r.max_score,
+        result=r.result,
+        comment=r.comment or None,
+        analysis=r.analysis or None,
+        confidence=r.confidence or None,
+    )
 
 
 class LLMService:
@@ -40,8 +53,10 @@ class LLMService:
                     rule_result.confidence = 1.0
                     return rule_result
 
-            return self.tongyi_client.grade_question(
-                question_type, question_text, student_answer, standard_answer, max_score
+            return _to_schema(
+                self.tongyi_client.grade_question(
+                    question_type, question_text, student_answer, standard_answer, max_score
+                )
             )
 
         except Exception as e:

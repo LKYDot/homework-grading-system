@@ -1,8 +1,21 @@
 import json
 import re
+from dataclasses import dataclass, field
+from typing import Optional
 from config import settings
 from utils.logger import logger
-from schemas.homework import GradingResult
+
+
+@dataclass
+class GradeResult:
+    question_block_id: int = 0
+    question_no: str = ""
+    score: float = 0
+    max_score: float = 0
+    result: str = "错误"
+    comment: str = ""
+    analysis: str = ""
+    confidence: float = 0.0
 
 try:
     import dashscope
@@ -69,7 +82,7 @@ class TongyiClient:
         student_answer: str,
         standard_answer: str,
         max_score: float,
-    ) -> GradingResult:
+    ) -> GradeResult:
         """单题智能批改"""
         if not DASHSCOPE_AVAILABLE:
             return self._mock_grade_question(
@@ -106,7 +119,7 @@ class TongyiClient:
                 response = self._call_dashscope(messages=messages)
             
             result = json.loads(response)
-            return GradingResult(
+            return GradeResult(
                 question_block_id=0,
                 question_no="",
                 score=result.get("score", 0),
@@ -119,7 +132,7 @@ class TongyiClient:
             
         except Exception as e:
             logger.error(f"单题批改失败: {str(e)}")
-            return GradingResult(
+            return GradeResult(
                 question_block_id=0,
                 question_no="",
                 score=0,
@@ -184,7 +197,7 @@ class TongyiClient:
             result = json.loads(response)
             if isinstance(result, list):
                 return [
-                    GradingResult(
+                    GradeResult(
                         question_block_id=idx,
                         question_no=str(r.get("question_no", idx + 1)),
                         score=r.get("score", 0),
@@ -233,7 +246,7 @@ class TongyiClient:
                 comment = "需要人工复核"
             
             results.append(
-                GradingResult(
+                GradeResult(
                     question_block_id=idx,
                     question_no=str(idx + 1),
                     score=score,
@@ -253,14 +266,14 @@ class TongyiClient:
         student_answer: str,
         standard_answer: str,
         max_score: float,
-    ) -> GradingResult:
+    ) -> GradeResult:
         """Mock单题批改"""
         student_answer = student_answer.strip()
         standard_answer = standard_answer.strip()
         
         if question_type in ["选择题", "判断题"]:
             if student_answer.upper() == standard_answer.upper():
-                return GradingResult(
+                return GradeResult(
                     question_block_id=0,
                     question_no="",
                     score=max_score,
@@ -271,7 +284,7 @@ class TongyiClient:
                     confidence=1.0,
                 )
             else:
-                return GradingResult(
+                return GradeResult(
                     question_block_id=0,
                     question_no="",
                     score=0,
@@ -286,7 +299,7 @@ class TongyiClient:
                 student_val = float(re.sub(r"[^\d.\-]", "", student_answer))
                 standard_val = float(re.sub(r"[^\d.\-]", "", standard_answer))
                 if abs(student_val - standard_val) < 1e-9:
-                    return GradingResult(
+                    return GradeResult(
                         question_block_id=0,
                         question_no="",
                         score=max_score,
@@ -297,7 +310,7 @@ class TongyiClient:
                         confidence=1.0,
                     )
                 elif abs(student_val - standard_val) < max(0.01, abs(standard_val) * 0.01):
-                    return GradingResult(
+                    return GradeResult(
                         question_block_id=0,
                         question_no="",
                         score=max_score * 0.5,
@@ -309,7 +322,7 @@ class TongyiClient:
                     )
             except:
                 pass
-            return GradingResult(
+            return GradeResult(
                 question_block_id=0,
                 question_no="",
                 score=0,
@@ -321,7 +334,7 @@ class TongyiClient:
             )
         else:
             if student_answer and standard_answer and student_answer == standard_answer:
-                return GradingResult(
+                return GradeResult(
                     question_block_id=0,
                     question_no="",
                     score=max_score,
@@ -331,7 +344,7 @@ class TongyiClient:
                     analysis="答案与标准答案一致",
                     confidence=0.7,
                 )
-            return GradingResult(
+            return GradeResult(
                 question_block_id=0,
                 question_no="",
                 score=max_score * 0.5,

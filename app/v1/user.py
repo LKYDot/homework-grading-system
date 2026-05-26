@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from utils.database import get_db
-from utils.security import create_access_token, verify_password, get_password_hash, get_current_user
+from utils.security import create_access_token, verify_password, get_password_hash
+from utils.deps import get_current_user
 from models.user import User
 from schemas.user import UserCreate, UserResponse, LoginRequest, TokenResponse
 from utils.logger import logger
@@ -101,7 +102,7 @@ async def get_user(user_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{user_id}/status")
-async def update_user_statue(
+async def update_user_status(
     user_id: int,
     is_active: bool,
     db: Session = Depends(get_db),
