@@ -14,7 +14,18 @@ export const useHomeworkStore = defineStore('homework', () => {
   const tasks = ref<TaskItem[]>([])
   const currentResult = ref<GradingResultResponse | null>(null)
   const loading = ref(false)
+  const error = ref('')
 
+  async function fetchTasks(userId: number) {
+    error.value = ''
+    try {
+      const { data } = await homeworkApi.getTaskList(userId)
+      tasks.value = data.data
+    } catch (e) {
+      error.value = '获取任务列表失败，请稍后重试'
+      console.error(e)
+    }
+  }
   async function upload(file: File, subject: string, grade: string, userId: number) {
     const form = new FormData()
     form.append('file', file)
@@ -50,5 +61,5 @@ export const useHomeworkStore = defineStore('homework', () => {
     return data.data
   }
 
-  return { tasks, currentResult, loading, upload, pollStatus, fetchResult }
+  return { tasks, currentResult, loading, error, upload, pollStatus, fetchResult, fetchTasks }
 })

@@ -24,6 +24,14 @@ export interface GradingResultResponse {
   created_at: string
 }
 
+export interface TaskItem {
+  task_id: string
+  status: string
+  subject: string
+  grade: string
+  created_at: string
+}
+
 export interface ApiResponse<T> {
   code: number
   message: string
@@ -39,5 +47,8 @@ export const homeworkApi = {
   },
   getResult(taskId: string) {
     return client.get<ApiResponse<GradingResultResponse>>(`/homework/result/${taskId}`)
+  },
+  getTaskList(userId: number) {
+    return client.get<ApiResponse<TaskItem[]>>(`/homework/list?user_id=${userId}`)
   },
 }

@@ -13,27 +13,33 @@ class ImageService:
         os.makedirs(self.upload_dir, exist_ok=True)
 
     def preprocess_image(self, image_path: str) -> str:
-        """图像预处理：EXIF校正、灰度化、边缘检测、透视变换、二值化"""
+        """图像预处理：EXIF校正、灰度化、透视矫正"""
         try:
-            # 读取图片并校正EXIF方向
             img = Image.open(image_path)
             img = self._correct_exif_orientation(img)
             img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+            
+            original_height, original_width = img_cv.shape[:2]
+            logger.debug(f"原始图片尺寸: {original_width}x{original_height}")
+            
+            min_dimension = 100
+            if original_width < min_dimension or original_height < min_dimension:
+                logger.warning(f"图片尺寸过小: {original_width}x{original_height}")
+                scale_factor = max(min_dimension / original_width, min_dimension / original_height)
+                new_width = int(original_width * scale_factor)
+                new_height = int(original_height * scale_factor)
+                img_cv = cv2.resize(img_cv, (new_width, new_height))
+                logger.info(f"图片已缩放至: {new_width}x{new_height}")
 
-            # 灰度化
             gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
 
-            # 自适应直方图均衡化
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             gray = clahe.apply(gray)
 
-            # 高斯滤波去噪
             blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
-            # 边缘检测
             edged = cv2.Canny(blur, 75, 200)
 
-            # 查找最大轮廓（试卷区域）
             contours, _ = cv2.findContours(
                 edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
             )
@@ -47,24 +53,24 @@ class ImageService:
                     screen_cnt = approx
                     break
 
+            warped = gray
             if screen_cnt is not None:
-                # 透视变换
-                warped = self._four_point_transform(gray, screen_cnt.reshape(4, 2))
-            else:
-                # 如果找不到轮廓，使用原图
-                warped = gray
+                try:
+                    warped = self._four_point_transform(gray, screen_cnt.reshape(4, 2))
+                    warped_height, warped_width = warped.shape[:2]
+                    if warped_width < 50 or warped_height < 50:
+                        logger.warning(f"透视变换后图片过小: {warped_width}x{warped_height}，使用原图")
+                        warped = gray
+                except Exception as e:
+                    logger.error(f"透视变换失败: {str(e)}，使用原图")
+                    warped = gray
 
-            # 自适应阈值二值化
-            thresh = cv2.adaptiveThreshold(
-                warped, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
-            )
-
-            # 保存预处理后的图片
             processed_filename = f"processed_{uuid.uuid4().hex}.jpg"
             processed_path = os.path.join(self.upload_dir, processed_filename)
-            cv2.imwrite(processed_path, thresh)
+            cv2.imwrite(processed_path, warped)
 
-            logger.info(f"图像预处理完成: {processed_path}")
+            final_height, final_width = warped.shape[:2]
+            logger.info(f"图像预处理完成: {processed_path}, 尺寸: {final_width}x{final_height}")
             return processed_path
 
         except Exception as e:
@@ -127,27 +133,61 @@ class ImageService:
     def crop_question_blocks(self, image_path: str, blocks: list) -> list:
         """根据切题结果裁剪单题图片"""
         img = cv2.imread(image_path)
+        
+        if img is None:
+            logger.error(f"无法读取图片文件: {image_path}")
+            raise ValueError(f"无法读取图片文件: {image_path}")
+        
+        img_height, img_width = img.shape[:2]
         cropped_blocks = []
 
         for block in blocks:
-            x1, y1, x2, y2 = block["x1"], block["y1"], block["x2"], block["y2"]
-            question_img = img[y1:y2, x1:x2]
+            try:
+                x1, y1, x2, y2 = block["x1"], block["y1"], block["x2"], block["y2"]
+                
+                x1 = max(0, int(x1))
+                y1 = max(0, int(y1))
+                x2 = min(img_width, int(x2))
+                y2 = min(img_height, int(y2))
+                
+                if x2 <= x1 or y2 <= y1:
+                    logger.warning(f"无效的裁剪坐标: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
+                    continue
+                
+                question_img = img[y1:y2, x1:x2]
+                
+                if question_img.size == 0:
+                    logger.warning(f"裁剪结果为空图片: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
+                    continue
 
-            cropped_filename = f"question_{uuid.uuid4().hex}.jpg"
-            cropped_path = os.path.join(self.upload_dir, cropped_filename)
-            cv2.imwrite(cropped_path, question_img)
+                cropped_filename = f"question_{uuid.uuid4().hex}.jpg"
+                cropped_path = os.path.join(self.upload_dir, cropped_filename)
+                
+                success = cv2.imwrite(cropped_path, question_img)
+                if not success:
+                    logger.error(f"保存裁剪图片失败: {cropped_path}")
+                    continue
 
-            cropped_blocks.append(
-                {
-                    "question_no": block["question_no"],
-                    "image_path": cropped_path,
-                    "x1": x1,
-                    "y1": y1,
-                    "x2": x2,
-                    "y2": y2,
-                }
-            )
+                cropped_blocks.append(
+                    {
+                        "question_no": block["question_no"],
+                        "image_path": cropped_path,
+                        "x1": x1,
+                        "y1": y1,
+                        "x2": x2,
+                        "y2": y2,
+                    }
+                )
+                logger.debug(f"成功裁剪题目图片: {cropped_path}")
+                
+            except KeyError as e:
+                logger.error(f"裁剪块缺少必要字段: {e}")
+            except Exception as e:
+                logger.error(f"裁剪图片失败: {str(e)}", exc_info=True)
 
+        if not cropped_blocks:
+            logger.warning("未成功裁剪任何题目图片")
+        
         return cropped_blocks
 
 

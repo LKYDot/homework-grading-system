@@ -1,6 +1,7 @@
 from clients.tongyi_client import tongyi_client, GradeResult
 from services.rule_engine import rule_engine
 from schemas.homework import GradingResult
+from config import settings
 from utils.logger import logger
 
 
@@ -41,17 +42,30 @@ class LLMService:
                     max_score,
                 )
                 if rule_result is not None:
-                    llm_result = self.tongyi_client.grade_question(
-                        question_type,
-                        question_text,
-                        student_answer,
-                        standard_answer,
-                        max_score,
-                    )
-                    rule_result.comment = llm_result.comment if llm_result.comment else rule_result.comment
-                    rule_result.analysis = llm_result.analysis if llm_result.analysis else rule_result.analysis
-                    rule_result.confidence = 1.0
+                    if settings.is_llm_enabled:
+                        llm_result = self.tongyi_client.grade_question(
+                            question_type,
+                            question_text,
+                            student_answer,
+                            standard_answer,
+                            max_score,
+                        )
+                        rule_result.comment = llm_result.comment or rule_result.comment
+                        rule_result.analysis = llm_result.analysis or rule_result.analysis
+                        rule_result.confidence = 1.0
                     return rule_result
+
+            if not settings.is_llm_enabled:
+                return GradingResult(
+                    question_block_id=0,
+                    question_no="",
+                    score=0,
+                    max_score=max_score,
+                    result="待复核",
+                    comment="大模型未启用，请人工批改",
+                    analysis="",
+                    confidence=0.0,
+                )
 
             return _to_schema(
                 self.tongyi_client.grade_question(

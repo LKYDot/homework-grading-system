@@ -5,8 +5,7 @@ from services.llm_service import llm_service
 from services.task_service import task_service
 from schemas.homework import GradingResult
 from utils.logger import logger
-from sqlalchemy.orm import Session
-from utils.database import get_db
+from utils.database import SessionLocal
 
 
 @celery_app.task(
@@ -16,7 +15,7 @@ def process_homework_task(
     self, task_id: str, image_path: str, subject: str, grade: str, user_id: int
 ):
     """处理作业批改任务"""
-    db: Session = next(get_db())
+    db = SessionLocal()
 
     try:
         task_service.update_task_status(db, task_id, "PROCESSING")
@@ -40,10 +39,17 @@ def process_homework_task(
 
         task_service.update_task_status(db, task_id, "OCRING")
         ocr_results = []
-        for block in cropped_blocks:
+        for idx, block in enumerate(cropped_blocks):
             ocr_result = aliyun_ocr_client.recognize_edu_question_ocr(
                 block["image_path"]
             )
+            
+            if not ocr_result.get("question_text") and idx < len(question_blocks):
+                paper_cut_text = question_blocks[idx].get("text", "")
+                if paper_cut_text:
+                    ocr_result["question_text"] = paper_cut_text
+                    logger.debug(f"使用切题API的文本: {paper_cut_text[:30]}...")
+            
             ocr_result["question_block_id"] = block["id"]
             ocr_result["question_no"] = block["question_no"]
             ocr_results.append(ocr_result)
@@ -89,11 +95,12 @@ def process_homework_task(
         task_service.update_task_total_score(db, task_id, total_score)
         task_service.update_task_status(db, task_id, "SUCCESS")
 
-        logger.info(f"作业任务处理完成: {task_id}, 总分: {total_score}")
+        logger.info("作业任务处理完成: %s, 总分: %s", task_id, total_score)
         return {"task_id": task_id, "status": "SUCCESS", "total_score": total_score}
 
     except Exception as e:
-        logger.error(f"作业任务处理失败: {task_id}, 错误: {str(e)}", exc_info=True)
+        logger.error("作业任务处理失败: %s, 错误: %s", task_id, str(e), exc_info=True)
+        db.rollback()
         task_service.update_task_status(db, task_id, "FAILED", str(e))
         raise self.retry(exc=e, countdown=5)
     finally:

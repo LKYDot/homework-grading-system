@@ -90,7 +90,7 @@ class TongyiClient:
             )
         
         try:
-            system_prompt = """
+            user_prompt = f"""
             你是一名中小学作业批改老师，请根据学生的答案进行批改。
             输出格式必须是JSON，包含：score, max_score, result, comment, analysis。
             score: 得分（数字）
@@ -98,18 +98,15 @@ class TongyiClient:
             result: 结果（正确/错误/部分正确）
             comment: 简短评语
             analysis: 详细分析
-            """
-            
-            user_prompt = f"""
+
             题目类型：{question_type}
             问题：{question_text}
             学生答案：{student_answer}
             标准答案：{standard_answer}
             满分：{max_score}
             """
-            
+
             messages = [
-                {"role": "system", "content": system_prompt.strip()},
                 {"role": "user", "content": user_prompt.strip()},
             ]
             
@@ -179,6 +176,8 @@ class TongyiClient:
         """
 
         user_prompt = f"""
+        {system_prompt.strip()}
+
         请批改以下作业：
 
         {questions_text}
@@ -187,7 +186,6 @@ class TongyiClient:
         """
 
         return [
-            {"role": "system", "content": system_prompt.strip()},
             {"role": "user", "content": user_prompt.strip()},
         ]
 

@@ -14,7 +14,9 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # ==================== 数据库配置 ====================
-    DATABASE_URL: str = "mysql+pymysql://homework_user:homework_password@localhost:3306/homework_db?charset=utf8mb4"
+    DATABASE_URL: str = (
+        "mysql+pymysql://homework_user:homework_password@localhost:3306/homework_db?charset=utf8mb4"
+    )
 
     # 数据库连接池配置
     DB_POOL_SIZE: int = 20
@@ -30,7 +32,7 @@ class Settings(BaseSettings):
     # ==================== 阿里云服务配置 ====================
     ALIYUN_ACCESS_KEY_ID: str = ""
     ALIYUN_ACCESS_KEY_SECRET: str = ""
-    ALIYUN_OCR_ENDPOINT: str = "ocr.cn-shanghai.aliyuncs.com"
+    ALIYUN_OCR_ENDPOINT: str = "ocr-api.cn-hangzhou.aliyuncs.com"
 
     # OCR服务开关
     ENABLE_ALIYUN_OCR: bool = True
@@ -38,7 +40,7 @@ class Settings(BaseSettings):
     # ==================== 通义千问配置 ====================
     DASHSCOPE_API_KEY: str = ""
 
-    LLM_MODEL: str = "qwen-turbo"
+    LLM_MODEL: str = "deepseek-v4-flash"
 
     # LLM服务开关
     ENABLE_LLM: bool = True

@@ -4,7 +4,12 @@ import uuid
 import os
 from utils.database import get_db
 from schemas.common import APIResponse
-from schemas.homework import TaskStatusResponse, GradingResultResponse
+from schemas.homework import (
+    HomeworkListResponse,
+    TaskStatusResponse,
+    GradingResultResponse,
+)
+from typing import List
 from services.task_service import task_service
 from tasks.homework_tasks import process_homework_task
 from config import settings
@@ -99,3 +104,17 @@ async def get_grading_result(task_id: str, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"查询批改结果失败: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="查询批改结果失败")
+
+
+@router.get("/list", response_model=APIResponse[List[HomeworkListResponse]])
+async def get_homework_list(user_id: int, db: Session = Depends(get_db)):
+    """获取作业列表"""
+    try:
+        result = task_service.get_homework_list(db, user_id)
+        return APIResponse(data=result)
+
+    except HTTPException as e:
+        raise
+    except Exception as e:
+        logger.error(f"获取作业列表失败: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="获取作业列表失败")

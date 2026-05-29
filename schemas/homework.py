@@ -21,6 +21,7 @@ class GradingResult(BaseModel):
     analysis: Optional[str] = None
     confidence: Optional[float] = None
     raw_response: Optional[Dict[str, Any]] = None
+
     # 从SQLAlchemy转换为pydantic Schema
     class Config:
         from_attributes = True
@@ -37,3 +38,13 @@ class HomeworkUploadRequest(BaseModel):
     subject: str
     grade: str
     user_id: int
+
+
+class HomeworkListResponse(BaseModel):
+    task_id: str
+    subject: str
+    grade: str
+    user_id: int
+    status: str
+    created_at: datetime
+    updated_at: datetime

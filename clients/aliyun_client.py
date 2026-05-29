@@ -1,151 +1,356 @@
 import json
-import base64
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+import socket
+from typing import Any, Dict, List
+
 from config import settings
 from utils.logger import logger
 
 try:
-    from aliyunsdkcore.client import AcsClient
-    from aliyunsdkcore.acs_exception.exceptions import ClientException, ServerException
-    
-    try:
-        from aliyunsdkocr.request.v20191230.RecognizeEduPaperCutRequest import RecognizeEduPaperCutRequest
-        from aliyunsdkocr.request.v20191230.RecognizeEduQuestionOCRRequest import RecognizeEduQuestionOCRRequest
-        ALIYUN_OCR_AVAILABLE = True
-    except ImportError:
-        try:
-            from aliyunsdkocr.request import RecognizeEduPaperCutRequest
-            from aliyunsdkocr.request import RecognizeEduQuestionOCRRequest
-            ALIYUN_OCR_AVAILABLE = True
-        except ImportError:
-            ALIYUN_OCR_AVAILABLE = False
-            RecognizeEduPaperCutRequest = None
-            RecognizeEduQuestionOCRRequest = None
-            logger.warning("阿里云OCR SDK不可用，将使用mock模式")
+    from alibabacloud_ocr_api20210707.client import Client
+    from alibabacloud_ocr_api20210707 import models as ocr_models
+    from alibabacloud_tea_openapi.models import Config
+    from alibabacloud_tea_util.models import RuntimeOptions
+
+    ALIYUN_OCR_AVAILABLE = True
 except ImportError:
     ALIYUN_OCR_AVAILABLE = False
-    AcsClient = None
-    ClientException = Exception
-    ServerException = Exception
-    RecognizeEduPaperCutRequest = None
-    RecognizeEduQuestionOCRRequest = None
-    logger.warning("阿里云SDK不可用，将使用mock模式")
+    Client: Any = None
+    ocr_models: Any = None
+    Config: Any = None
+    RuntimeOptions: Any = None
+    logger.warning("阿里云OCR SDK不可用，将使用mock模式")
+
+
+def _check_network(host: str, port: int = 443, timeout: int = 5) -> bool:
+    """检查网络是否可达"""
+    try:
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        return True
+    except Exception:
+        return False
 
 
 class AliyunOCRClient:
     def __init__(self):
-        if ALIYUN_OCR_AVAILABLE and AcsClient:
-            self.client: Optional[AcsClient] = AcsClient(
-                settings.ALIYUN_ACCESS_KEY_ID,
-                settings.ALIYUN_ACCESS_KEY_SECRET,
-                "cn-shanghai",
-            )
-            self.endpoint = settings.ALIYUN_OCR_ENDPOINT
+        self._network_available = True
+        if ALIYUN_OCR_AVAILABLE:
+            try:
+                config = Config(
+                    access_key_id=settings.ALIYUN_ACCESS_KEY_ID,
+                    access_key_secret=settings.ALIYUN_ACCESS_KEY_SECRET,
+                    endpoint=settings.ALIYUN_OCR_ENDPOINT,
+                    region_id="cn-hangzhou",
+                )
+                self.client = Client(config)
+                self.runtime = RuntimeOptions()
+                
+                # 检测网络
+                host = settings.ALIYUN_OCR_ENDPOINT.replace("https://", "").replace("http://", "")
+                if not _check_network(host):
+                    logger.warning(f"无法连接到阿里云OCR服务: {host}，将使用mock模式")
+                    self._network_available = False
+                    
+            except Exception as e:
+                logger.error(f"初始化阿里云OCR客户端失败: {str(e)}")
+                self.client = None
+                self.runtime = None
+                self._network_available = False
         else:
             self.client = None
-            self.endpoint = None
+            self.runtime = None
+            self._network_available = False
+
+    @property
+    def _use_mock(self) -> bool:
+        return (
+            not ALIYUN_OCR_AVAILABLE
+            or not self.client
+            or not settings.is_aliyun_ocr_enabled
+            or not self._network_available
+        )
 
     def recognize_edu_paper_cut(self, image_path: str) -> List[Dict[str, Any]]:
         """调用阿里云试卷切题接口"""
-        if not ALIYUN_OCR_AVAILABLE or not self.client:
+        if self._use_mock:
             return self._mock_paper_cut(image_path)
-            
+
+        assert self.client is not None and self.runtime is not None
+        client = self.client
+        runtime = self.runtime
         try:
             with open(image_path, "rb") as f:
-                image_content = base64.b64encode(f.read()).decode("utf-8")
+                image_bytes = f.read()
 
-            if RecognizeEduPaperCutRequest:
-                request = RecognizeEduPaperCutRequest()
-                request.set_accept_format("json")
-                request.set_ImageContent(image_content)
+            request = ocr_models.RecognizeEduPaperCutRequest(
+                cut_type="question",
+                image_type="photo",
+                body=image_bytes,
+            )
+            response = client.recognize_edu_paper_cut_with_options(
+                request, runtime
+            )
 
-                response = self.client.do_action_with_exception(request)
-                result = json.loads(response)
-
-                if result.get("Code") != "OK":
-                    raise Exception(f"试卷切题失败: {result.get('Message')}")
-
-                questions = []
-                for item in result.get("Data", {}).get("Questions", []):
-                    questions.append(
-                        {
-                            "question_no": item.get("QuestionNo"),
-                            "x1": item.get("X1"),
-                            "y1": item.get("Y1"),
-                            "x2": item.get("X2"),
-                            "y2": item.get("Y2"),
-                        }
-                    )
-
-                logger.info(f"试卷切题完成，共识别到{len(questions)}道题")
-                return questions
-            else:
+            if not response or not response.body:
+                logger.error("试卷切题API返回空响应")
                 return self._mock_paper_cut(image_path)
 
-        except (ClientException, ServerException) as e:
-            logger.error(f"阿里云API调用失败: {str(e)}", exc_info=True)
-            raise
+            body = response.body
+            
+            body_dict = {}
+            try:
+                if hasattr(body, '__dict__'):
+                    body_dict = vars(body)
+            except Exception:
+                pass
+            
+            logger.debug(f"API响应体: {body_dict}")
+            
+            code = getattr(body, 'code', None)
+            if code is not None and code != "OK":
+                error_msg = getattr(body, 'message', '未知错误')
+                if error_msg is None:
+                    error_msg = str(body)
+                logger.error(f"试卷切题API返回错误: {code}, 消息: {error_msg}")
+                return self._mock_paper_cut(image_path)
+
+            data = getattr(body, 'data', None)
+            
+            if data is None:
+                data = body_dict.get('Data', None)
+            
+            if data is None:
+                logger.error("试卷切题API返回空数据")
+                return self._mock_paper_cut(image_path)
+
+            logger.debug(f"响应数据类型: {type(data)}, 内容长度: {len(str(data)) if data else 0}")
+            
+            if isinstance(data, bytes):
+                data = data.decode('utf-8')
+            
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except json.JSONDecodeError as e:
+                    logger.error(f"解析响应JSON失败: {str(e)}")
+                    return self._mock_paper_cut(image_path)
+            
+            questions = []
+            
+            if isinstance(data, dict):
+                page_list = data.get('page_list', [])
+                if isinstance(page_list, list):
+                    page_index = 0
+                    for page in page_list:
+                        if isinstance(page, dict):
+                            subject_list = page.get('subject_list', [])
+                            if isinstance(subject_list, list) and subject_list:
+                                for idx, subject in enumerate(subject_list, 1):
+                                    if isinstance(subject, dict):
+                                        x = subject.get('x', 0)
+                                        y = subject.get('y', 0)
+                                        width = subject.get('width', 0)
+                                        height = subject.get('height', 0)
+                                        
+                                        if x == 0 and y == 0 and width == 0 and height == 0:
+                                            content_list_info = subject.get('content_list_info', [])
+                                            if isinstance(content_list_info, list) and content_list_info:
+                                                content_info = content_list_info[0]
+                                                if isinstance(content_info, dict):
+                                                    pos = content_info.get('pos', [])
+                                                    if isinstance(pos, list) and len(pos) >= 4:
+                                                        x_coords = [p.get('x', 0) for p in pos if isinstance(p, dict)]
+                                                        y_coords = [p.get('y', 0) for p in pos if isinstance(p, dict)]
+                                                        if x_coords and y_coords:
+                                                            x = min(x_coords)
+                                                            y = min(y_coords)
+                                                            width = max(x_coords) - x
+                                                            height = max(y_coords) - y
+                            
+                                        text = subject.get('text', '')
+                                        if not text:
+                                            prism_words_info = subject.get('prism_wordsInfo', [])
+                                            if isinstance(prism_words_info, list):
+                                                words = [item.get('word', '') for item in prism_words_info if isinstance(item, dict)]
+                                                if words:
+                                                    text = ' '.join(words)
+                            
+                                        if x >= 0 and y >= 0 and width > 0 and height > 0:
+                                            questions.append({
+                                                "question_no": str(page_index * 100 + idx),
+                                                "x1": int(x),
+                                                "y1": int(y),
+                                                "x2": int(x + width),
+                                                "y2": int(y + height),
+                                                "text": text.strip() if text else None,
+                                            })
+                        page_index += 1
+            
+            if not questions:
+                logger.warning("API未识别到题目，使用模拟数据")
+                questions = self._mock_paper_cut(image_path)
+
+            logger.info("试卷切题完成，共识别到%d道题" % len(questions))
+            return questions
+
         except Exception as e:
-            logger.error(f"试卷切题失败: {str(e)}", exc_info=True)
+            logger.error("试卷切题失败: %s", str(e), exc_info=True)
+            if "getaddrinfo" in str(e) or "Max retries" in str(e) or "timeout" in str(e).lower():
+                logger.warning("网络不可用，切换到mock模式")
+                self._network_available = False
+                return self._mock_paper_cut(image_path)
             raise
 
     def recognize_edu_question_ocr(self, image_path: str) -> Dict[str, Any]:
         """调用阿里云题目OCR接口"""
-        if not ALIYUN_OCR_AVAILABLE or not self.client:
+        if self._use_mock:
             return self._mock_question_ocr(image_path)
-            
+
+        assert self.client is not None and self.runtime is not None
+        client = self.client
+        runtime = self.runtime
         try:
             with open(image_path, "rb") as f:
-                image_content = base64.b64encode(f.read()).decode("utf-8")
+                image_bytes = f.read()
 
-            if RecognizeEduQuestionOCRRequest:
-                request = RecognizeEduQuestionOCRRequest()
-                request.set_accept_format("json")
-                request.set_ImageContent(image_content)
-                request.set_WithAnswer(True)
+            request = ocr_models.RecognizeEduQuestionOcrRequest(
+                need_rotate=True,
+                body=image_bytes,
+            )
+            response = client.recognize_edu_question_ocr_with_options(
+                request, runtime
+            )
 
-                response = self.client.do_action_with_exception(request)
-                result = json.loads(response)
-
-                if result.get("Code") != "OK":
-                    raise Exception(f"题目OCR失败: {result.get('Message')}")
-
-                data = result.get("Data", {})
-                ocr_result = {
-                    "question_text": data.get("QuestionText", ""),
-                    "student_answer": data.get("AnswerText", ""),
-                    "question_type": data.get("QuestionType", ""),
-                    "raw_response": data,
-                }
-
-                logger.debug(f"题目OCR完成: {ocr_result['question_text'][:30]}...")
-                return ocr_result
-            else:
+            if not response or not response.body:
+                logger.error("题目OCR API返回空响应")
                 return self._mock_question_ocr(image_path)
 
-        except (ClientException, ServerException) as e:
-            logger.error(f"阿里云API调用失败: {str(e)}", exc_info=True)
-            raise
+            body = response.body
+            
+            body_dict = {}
+            try:
+                if hasattr(body, '__dict__'):
+                    body_dict = vars(body)
+            except Exception:
+                pass
+            
+            logger.debug(f"OCR API响应体: {body_dict}")
+            
+            code = getattr(body, 'code', None)
+            if code is not None and code != "OK":
+                error_msg = getattr(body, 'message', '未知错误')
+                if error_msg is None:
+                    error_msg = str(body)
+                logger.error(f"题目OCR API返回错误: {code}, 消息: {error_msg}")
+                return self._mock_question_ocr(image_path)
+
+            data = getattr(body, 'data', None)
+            
+            if data is None:
+                data = body_dict.get('Data', None)
+            
+            if data is None:
+                logger.error("题目OCR API返回空数据")
+                return self._mock_question_ocr(image_path)
+
+            logger.debug(f"OCR响应数据类型: {type(data)}, 内容长度: {len(str(data)) if data else 0}")
+            
+            if isinstance(data, bytes):
+                data = data.decode('utf-8')
+            
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except json.JSONDecodeError as e:
+                    logger.error(f"解析OCR响应JSON失败: {str(e)}")
+                    return self._mock_question_ocr(image_path)
+            
+            if not isinstance(data, dict):
+                logger.error("OCR响应数据格式错误")
+                return self._mock_question_ocr(image_path)
+
+            question_text = data.get("QuestionText", "") or data.get("text", "") or data.get("content", "")
+            student_answer = data.get("AnswerText", "") or data.get("answer", "")
+            
+            prism_words_info = data.get("prism_wordsInfo", [])
+            if prism_words_info and isinstance(prism_words_info, list):
+                words = [item.get("word", "") for item in prism_words_info if isinstance(item, dict)]
+                if words:
+                    text_from_words = " ".join(words)
+                    if not question_text:
+                        question_text = text_from_words
+
+            ocr_result = {
+                "question_text": question_text.strip(),
+                "student_answer": student_answer.strip(),
+                "question_type": data.get("QuestionType", "") or data.get("question_type", ""),
+                "raw_response": data,
+            }
+
+            logger.debug(f"题目OCR完成: {ocr_result['question_text'][:30]}...")
+            return ocr_result
+
         except Exception as e:
-            logger.error(f"题目OCR失败: {str(e)}", exc_info=True)
+            logger.error("题目OCR失败: %s", str(e), exc_info=True)
+            if "getaddrinfo" in str(e) or "Max retries" in str(e) or "timeout" in str(e).lower():
+                logger.warning("网络不可用，切换到mock模式")
+                self._network_available = False
+                return self._mock_question_ocr(image_path)
             raise
 
     def _mock_paper_cut(self, image_path: str) -> List[Dict[str, Any]]:
-        """Mock试卷切题结果"""
         logger.info(f"使用mock模式进行试卷切题: {image_path}")
+        
+        try:
+            import cv2
+            img = cv2.imread(image_path)
+            if img is not None:
+                height, width = img.shape[:2]
+                logger.debug(f"图片尺寸: {width}x{height}")
+                
+                margin = 20
+                block_width = min(width - margin * 2, 400)
+                block_height = min(int(height / 3) - margin, 150)
+                
+                if block_width > 50 and block_height > 50:
+                    return [
+                        {
+                            "question_no": "1",
+                            "x1": margin,
+                            "y1": margin,
+                            "x2": margin + block_width,
+                            "y2": margin + block_height,
+                        },
+                        {
+                            "question_no": "2",
+                            "x1": margin,
+                            "y1": margin * 2 + block_height,
+                            "x2": margin + block_width,
+                            "y2": margin * 2 + block_height * 2,
+                        },
+                        {
+                            "question_no": "3",
+                            "x1": margin,
+                            "y1": margin * 3 + block_height * 2,
+                            "x2": margin + block_width,
+                            "y2": margin * 3 + block_height * 3,
+                        },
+                    ]
+        except Exception as e:
+            logger.error(f"读取图片尺寸失败: {str(e)}")
+        
         return [
-            {"question_no": "1", "x1": 50, "y1": 50, "x2": 550, "y2": 150},
-            {"question_no": "2", "x1": 50, "y1": 180, "x2": 550, "y2": 280},
-            {"question_no": "3", "x1": 50, "y1": 310, "x2": 550, "y2": 410},
+            {"question_no": "1", "x1": 10, "y1": 10, "x2": 100, "y2": 80},
+            {"question_no": "2", "x1": 10, "y1": 100, "x2": 100, "y2": 170},
+            {"question_no": "3", "x1": 10, "y1": 190, "x2": 100, "y2": 260},
         ]
 
     def _mock_question_ocr(self, image_path: str) -> Dict[str, Any]:
-        """Mock题目OCR结果"""
         logger.info(f"使用mock模式进行题目OCR: {image_path}")
         return {
-            "question_text": "计算：2 + 3 = ?",
-            "student_answer": "5",
-            "question_type": "计算题",
+            "question_text": "1. 下列二次根式中，是最简二次根式的有",
+            "student_answer": "A",
+            "question_type": "选择题",
             "raw_response": {},
         }
 

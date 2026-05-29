@@ -1,3 +1,9 @@
+import os
+import sys
+
+# 添加项目路径到 sys.path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from celery import Celery
 from config import settings
 
@@ -17,8 +23,10 @@ celery_app.conf.update(
     enable_utc=True,
     task_acks_late=True,
     task_reject_on_worker_lost=True,
-    task_max_retries=3,
-    worker_prefetch_multiplier=1,
+    task_time_limit=settings.CELERY_TASK_TIMEOUT,
+    worker_prefetch_multiplier=settings.CELERY_WORKER_PREFETCH_MULTIPLIER,
+    task_track_started=True,
+    worker_pool="solo",
 )
 
 # 路由配置

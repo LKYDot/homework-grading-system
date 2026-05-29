@@ -62,9 +62,12 @@ class TaskService:
             db.commit()
 
     def save_processed_image(self, db: Session, task_id: str, processed_path: str):
-        image = HomeworkImage(task_id=task_id, processed_url=processed_path)
-        db.add(image)
-        db.commit()
+        image = db.query(HomeworkImage).filter(HomeworkImage.task_id == task_id).first()
+        if image:
+            image.processed_url = processed_path
+            db.commit()
+        else:
+            logger.warning(f"未找到任务 {task_id} 的图片记录")
 
     def save_question_blocks(self, db: Session, task_id: str, blocks: List[dict]):
         for block in blocks:
@@ -152,18 +155,68 @@ class TaskService:
             "created_at": task.created_at,
         }
 
+    def get_homework_list(self, db, user_id):
+        tasks = (
+            db.query(HomeworkTask)
+            .filter(HomeworkTask.user_id == user_id)
+            .order_by(HomeworkTask.created_at.desc())
+            .all()
+        )
+        
+        result = []
+        for task in tasks:
+            result.append({
+                "task_id": task.task_id,
+                "user_id": task.user_id,
+                "subject": task.subject,
+                "grade": task.grade,
+                "status": task.status,
+                "created_at": task.created_at,
+                "updated_at": task.updated_at,
+            })
+        
+        return result
+
     def match_standard_answer(
         self, db: Session, subject: str, grade: str, question_text: str
     ) -> Optional[StandardAnswer]:
-        return (
-            db.query(StandardAnswer)
-            .filter(
-                StandardAnswer.subject == subject,
-                StandardAnswer.grade == grade,
-                StandardAnswer.question_text == question_text,
+        if not question_text:
+            return None
+        
+        try:
+            exact_match = (
+                db.query(StandardAnswer)
+                .filter(
+                    StandardAnswer.subject == subject,
+                    StandardAnswer.grade == grade,
+                    StandardAnswer.question_text == question_text,
+                )
+                .first()
             )
-            .first()
-        )
+            if exact_match:
+                return exact_match
+            
+            keywords = [word for word in question_text.strip()[:50].split() if len(word) >= 3]
+            if keywords:
+                for keyword in keywords[:3]:
+                    fuzzy_match = (
+                        db.query(StandardAnswer)
+                        .filter(
+                            StandardAnswer.subject == subject,
+                            StandardAnswer.grade == grade,
+                            StandardAnswer.question_text.like(f"%{keyword}%"),
+                        )
+                        .first()
+                    )
+                    if fuzzy_match:
+                        logger.debug(f"模糊匹配成功: '{keyword}' -> {fuzzy_match.question_key}")
+                        return fuzzy_match
+            
+            logger.debug(f"未找到匹配的标准答案: {question_text[:50]}...")
+            return None
+        except Exception as e:
+            logger.error(f"匹配标准答案失败: {str(e)}")
+            return None
 
 
 task_service = TaskService()
