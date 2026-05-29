@@ -1,4 +1,4 @@
-from clients.tongyi_client import tongyi_client, GradeResult
+from clients.deepseek_client import deepseek_client, GradeResult
 from services.rule_engine import rule_engine
 from schemas.homework import GradingResult
 from config import settings
@@ -20,7 +20,7 @@ def _to_schema(r: GradeResult) -> GradingResult:
 
 class LLMService:
     def __init__(self):
-        self.tongyi_client = tongyi_client
+        self.deepseek_client = deepseek_client
         self.rule_engine = rule_engine
 
     def grade_question(
@@ -43,7 +43,7 @@ class LLMService:
                 )
                 if rule_result is not None:
                     if settings.is_llm_enabled:
-                        llm_result = self.tongyi_client.grade_question(
+                        llm_result = self.deepseek_client.grade_question(
                             question_type,
                             question_text,
                             student_answer,
@@ -68,7 +68,7 @@ class LLMService:
                 )
 
             return _to_schema(
-                self.tongyi_client.grade_question(
+                self.deepseek_client.grade_question(
                     question_type, question_text, student_answer, standard_answer, max_score
                 )
             )

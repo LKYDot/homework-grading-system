@@ -819,11 +819,11 @@ A. 安全性 — 作业上传不应明文传 user_id
 
 API_DOCS.md 第 5.1 节 的 upload 接口把 user_id 作为表单参数传递，任何知道该 ID 的人都可以冒用身份上传。建议改为从 JWT token 中提取当前用户，upload 接口标记为需要认证。
 
-B. 命名一致性问题
+B. ~~命名一致性问题~~（已修复）
 
-clients/tongyi_client.py 文件名仍带 "tongyi"，但实际调用的是 DeepSeek 模型。建议重命名为 llm_client.py 或 deepseek_client.py，类名 TongyiClient 也一并修改，避免新人误解。
+clients/tongyi_client.py 已重命名为 deepseek_client.py，类名已改为 DeepSeekClient。
 
-C. config.py 默认模型与文档不一致
+C. config.py 默认模型建议
 
 config.py:43 默认值是 deepseek-v4-flash，而文档和 .env.example 写的是 deepseek-v4-pro。建议统一，并在文档中说明两个模型的适用场景（v4-flash 更快更便宜，v4-pro 推理能力更强适合复杂批改）。
 

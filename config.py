@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     # OCR服务开关
     ENABLE_ALIYUN_OCR: bool = True
 
-    # ==================== 通义千问配置 ====================
+    # ==================== DeepSeek 大模型配置（通过阿里云百炼 DashScope API）====================
     DASHSCOPE_API_KEY: str = ""
 
     LLM_MODEL: str = "deepseek-v4-flash"

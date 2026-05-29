@@ -23,7 +23,7 @@ try:
     DASHSCOPE_AVAILABLE = True
 except ImportError:
     DASHSCOPE_AVAILABLE = False
-    logger.warning("通义千问SDK不可用，将使用mock模式")
+    logger.warning("DashScope SDK不可用，将使用mock模式")
 
 try:
     import pybreaker
@@ -44,10 +44,10 @@ if DASHSCOPE_AVAILABLE:
     dashscope.api_key = settings.DASHSCOPE_API_KEY
 
 
-class TongyiClient:
+class DeepSeekClient:
     def __init__(self):
         if DASHSCOPE_AVAILABLE:
-            self.model = settings.LLM_MODEL or "qwen-turbo"
+            self.model = settings.LLM_MODEL or "deepseek-v4-pro"
         else:
             self.model = "mock"
 
@@ -141,7 +141,7 @@ class TongyiClient:
             )
 
     def _call_dashscope(self, messages: list) -> dict:
-        """调用通义千问API"""
+        """调用DeepSeek API（通过阿里云百炼 DashScope）"""
         response = Generation.call(
             model=self.model,
             messages=messages,
@@ -354,4 +354,4 @@ class TongyiClient:
             )
 
 
-tongyi_client = TongyiClient()
+deepseek_client = DeepSeekClient()
