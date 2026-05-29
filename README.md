@@ -16,7 +16,7 @@
 ## 技术栈
 
 - **框架**: FastAPI
-- **数据库**: SQLite / PostgreSQL
+- **数据库**: MySQL 
 - **异步任务**: Celery + Redis
 - **日志**: Loguru
 - **认证**: JWT
