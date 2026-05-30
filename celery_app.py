@@ -32,4 +32,6 @@ celery_app.conf.update(
 # 路由配置
 celery_app.conf.task_routes = {
     "tasks.homework_tasks.process_homework_task": {"queue": "homework"},
+    "tasks.homework_tasks.process_analyze_task": {"queue": "homework"},
+    "tasks.homework_tasks.process_grade_only_task": {"queue": "homework"},
 }

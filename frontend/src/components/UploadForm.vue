@@ -1,16 +1,22 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useHomeworkStore } from '@/stores/homework'
 
 const emit = defineEmits<{
-  upload: [file: File, subject: string, grade: string]
+  upload: [file: File, subject: string, grade: string, model: string]
+  analyze: [file: File, subject: string, grade: string, model: string]
 }>()
+
+const homework = useHomeworkStore()
 
 const file = ref<File | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const previewUrl = ref('')
 const subject = ref('math')
-const grade = ref('grade1')
+const grade = ref('grade8')
+const model = ref('')
 const dragOver = ref(false)
+const mode = ref<'ocr_llm' | 'llm_only'>('ocr_llm')
 
 const subjects = [
   { value: 'math', label: '数学' },
@@ -31,6 +37,22 @@ const grades = [
   { value: 'grade8', label: '八年级' },
   { value: 'grade9', label: '九年级' },
 ]
+
+const availableModels = computed(() => {
+  return homework.models.filter((m: any) => m.enabled)
+})
+
+const textModels = computed(() => {
+  return homework.models.filter((m: any) => m.enabled && (m.type === 'text' || m.supported_features?.includes('text')))
+})
+
+const visionModels = computed(() => {
+  return homework.models.filter((m: any) => m.enabled && (m.type === 'vision' || m.supported_features?.includes('vision')))
+})
+
+watch(mode, () => {
+  model.value = ''
+})
 
 function handleFile(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0]
@@ -59,12 +81,17 @@ function handleKeydown(e: KeyboardEvent) {
 function resetFile() {
   file.value = null
   previewUrl.value = ''
+  model.value = ''
   if (fileInput.value) fileInput.value.value = ''
 }
 
 function submit() {
   if (!file.value) return
-  emit('upload', file.value, subject.value, grade.value)
+  if (mode.value === 'ocr_llm') {
+    emit('upload', file.value, subject.value, grade.value, model.value || '')
+  } else {
+    emit('analyze', file.value, subject.value, grade.value, model.value || '')
+  }
   resetFile()
 }
 </script>
@@ -118,16 +145,30 @@ function submit() {
           <option v-for="g in grades" :key="g.value" :value="g.value">{{ g.label }}</option>
         </select>
       </div>
+      <div class="form-group" style="flex:1;min-width:140px;margin-bottom:0;">
+        <label class="form-label" for="upload-mode">处理模式</label>
+        <select id="upload-mode" v-model="mode" class="form-select">
+          <option value="ocr_llm">阿里云OCR+大模型批改</option>
+          <option value="llm_only">大模型分析</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:1;min-width:140px;margin-bottom:0;" v-if="availableModels.length > 0">
+        <label class="form-label" for="upload-model">选择模型</label>
+        <select id="upload-model" v-model="model" class="form-select">
+          <option value="" disabled>选择模型</option>
+          <option v-for="m in availableModels" :key="m.name" :value="m.name">{{ m.name }} ({{ m.type === 'text' ? '文本' : '视觉' }})</option>
+        </select>
+      </div>
       <button
         class="btn btn-primary"
         :disabled="!file"
-        aria-label="提交批改"
+        aria-label="提交"
         @click="submit"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;" aria-hidden="true">
           <polyline points="20 6 9 17 4 12"/>
         </svg>
-        提交批改
+        {{ mode === 'ocr_llm' ? '提交批改' : '分析题目' }}
       </button>
     </div>
   </div>

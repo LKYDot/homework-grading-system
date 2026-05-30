@@ -21,6 +21,7 @@ class HomeworkTask(BaseModel):
         comment="任务状态：PENDING/PROCESSING/SUCCESS/FAILED",
     )
     total_score: Mapped[Decimal | None] = mapped_column(DECIMAL(5, 2), default=0, comment="总分")
+    grading_mode: Mapped[str | None] = mapped_column(String(10), nullable=True, comment="批改模式: ocr/vision")
     error_message: Mapped[str | None] = mapped_column(Text, comment="错误信息")
 
     user = relationship("User", back_populates="homework_tasks")
@@ -134,6 +135,7 @@ class GradingResult(BaseModel):
     question_no: Mapped[str] = mapped_column(String(20), nullable=False, comment="题号")
     score: Mapped[Decimal] = mapped_column(DECIMAL(5, 2), nullable=False, comment="得分")
     max_score: Mapped[Decimal] = mapped_column(DECIMAL(5, 2), nullable=False, comment="满分")
+    accuracy: Mapped[Decimal | None] = mapped_column(DECIMAL(5, 2), nullable=True, comment="正确率 0-100")
     result: Mapped[str] = mapped_column(String(20), nullable=False, comment="批改结果：正确/部分正确/错误")
     comment: Mapped[str | None] = mapped_column(Text, comment="批改批注")
     analysis: Mapped[str | None] = mapped_column(Text, comment="题目解析")

@@ -44,11 +44,19 @@ async def get_user_statistics(user_id: int, db: Session = Depends(get_db)):
         )
         latest_score = float(latest_task.total_score) if latest_task else 0
 
+        avg_accuracy = (
+            db.query(func.avg(GradingResult.accuracy))
+            .join(HomeworkTask, GradingResult.task_id == HomeworkTask.task_id)
+            .filter(HomeworkTask.user_id == user_id, HomeworkTask.status == "SUCCESS")
+            .scalar()
+        )
+
         return APIResponse(
             data={
                 "task_count": task_count,
                 "completed_count": completed_count,
                 "avg_score": float(avg_score) if avg_score else 0,
+                "avg_accuracy": float(avg_accuracy) if avg_accuracy else 0,
                 "latest_score": latest_score,
             }
         )
@@ -84,12 +92,20 @@ async def get_global_statistics(db: Session = Depends(get_db)):
             .scalar()
         )
 
+        avg_accuracy = (
+            db.query(func.avg(GradingResult.accuracy))
+            .join(HomeworkTask, GradingResult.task_id == HomeworkTask.task_id)
+            .filter(HomeworkTask.status == "SUCCESS")
+            .scalar()
+        )
+
         return APIResponse(
             data={
                 "user_count": user_count,
                 "task_count": task_count,
                 "completed_count": completed_count,
                 "avg_score": float(avg_score) if avg_score else 0,
+                "avg_accuracy": float(avg_accuracy) if avg_accuracy else 0,
             }
         )
 

@@ -4,8 +4,9 @@ from fastapi.responses import JSONResponse
 import uvicorn
 from contextlib import asynccontextmanager
 from config import settings
-from app.v1 import homework, user, statistics
-from utils.database import create_tables
+from app.v1 import homework, user, statistics, answers
+from utils.database import create_tables, SessionLocal
+from utils.seed_data import check_standard_answers
 from utils.logger import logger
 from utils.exceptions import BusinessException
 
@@ -14,6 +15,20 @@ from utils.exceptions import BusinessException
 async def app_lifespan(app: FastAPI):
     logger.info("启动服务...")
     create_tables()
+    db = SessionLocal()
+    try:
+        check_standard_answers(db)
+    finally:
+        db.close()
+
+    # 检查大模型配置
+    models = settings.parsed_models
+    if settings.is_llm_enabled:
+        names = [m.name for m in settings.text_models]
+        logger.info(f"大模型已启用: text_models={names}, grading_mode={settings.GRADING_MODE}")
+    else:
+        logger.warning("大模型未启用（MODELS_CONFIG 未配置或所有模型 disabled），批改将使用 Mock 模式")
+
     logger.info(f"服务启动成功，访问地址：http://{settings.HOST}:{settings.PORT}")
     yield
     logger.info("服务正在关闭...")
@@ -60,6 +75,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(homework.router, prefix="/api/v1")
 app.include_router(user.router, prefix="/api/v1")
 app.include_router(statistics.router, prefix="/api/v1")
+app.include_router(answers.router, prefix="/api/v1")
 
 
 @app.get("/")
@@ -78,6 +94,41 @@ async def health_check():
         "status": "ok",
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
+    }
+
+
+@app.get("/api/v1/models")
+async def list_models():
+    """获取可用模型列表"""
+    from schemas.model import ModelInfo, ModelsResponse
+    models_list = [
+        ModelInfo(
+            name=m.name, provider=m.provider, type=m.type,
+            model_id=m.model_id, enabled=m.enabled,
+        )
+        for m in settings.parsed_models
+    ]
+    return {"code": 200, "message": "success", "data": ModelsResponse(models=models_list).model_dump()}
+
+
+@app.get("/api/v1/config")
+async def get_config():
+    """获取系统配置"""
+    from schemas.model import ConfigResponse
+    return {
+        "code": 200,
+        "message": "success",
+        "data": ConfigResponse(
+            grading_mode=settings.GRADING_MODE,
+            ocr_enabled=settings.is_aliyun_ocr_enabled,
+            models_count=len(settings.parsed_models),
+            upload_limits={
+                "max_size": settings.MAX_UPLOAD_SIZE,
+                "allowed_extensions": settings.ALLOWED_EXTENSIONS,
+            },
+            app_name=settings.APP_NAME,
+            app_version=settings.APP_VERSION,
+        ).model_dump(),
     }
 
 

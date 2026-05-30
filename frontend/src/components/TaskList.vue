@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TaskItem } from '@/stores/homework'
+import type { TaskItem } from '@/api/homework'
 import TaskCard from './TaskCard.vue'
 
 defineProps<{

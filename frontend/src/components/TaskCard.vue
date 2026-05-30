@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { TaskItem } from '@/stores/homework'
+import type { TaskItem } from '@/api/homework'
 
 const props = defineProps<{
   task: TaskItem
@@ -18,6 +18,13 @@ const statusLabel = computed(() => {
     FAILED: '失败',
   }
   return map[props.task.status] || props.task.status
+})
+
+const accuracyClass = computed(() => {
+  if (props.task.status !== 'SUCCESS') return ''
+  if (props.task.accuracy >= 80) return 'high'
+  if (props.task.accuracy >= 60) return 'medium'
+  return 'low'
 })
 
 const subjectLabel: Record<string, string> = {
@@ -46,6 +53,10 @@ const gradeLabel: Record<string, string> = {
         <span>{{ gradeLabel[task.grade] || task.grade }}</span>
       </div>
       <div class="task-id">{{ task.task_id }}</div>
+      <div v-if="task.status === 'SUCCESS'" class="task-score">
+        <span :class="accuracyClass">正确率 {{ (task.accuracy ?? 0).toFixed(1) }}%</span>
+        <span>得分 {{ task.total_score || 0 }}/{{ task.total_max_score || 0 }}</span>
+      </div>
     </div>
     <span class="badge" :class="'badge-' + task.status.toLowerCase().split(' ')[0]" role="status">
       {{ statusLabel }}

@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from datetime import datetime
-from decimal import Decimal
 
 
 class TaskStatusResponse(BaseModel):
@@ -16,13 +15,13 @@ class GradingResult(BaseModel):
     question_no: str
     score: float
     max_score: float
+    accuracy: Optional[float] = None   # 正确率 0-100
     result: str
     comment: Optional[str] = None
     analysis: Optional[str] = None
     confidence: Optional[float] = None
     raw_response: Optional[Dict[str, Any]] = None
 
-    # 从SQLAlchemy转换为pydantic Schema
     class Config:
         from_attributes = True
 
@@ -30,6 +29,8 @@ class GradingResult(BaseModel):
 class GradingResultResponse(BaseModel):
     task_id: str
     total_score: float
+    total_accuracy: Optional[float] = None   # 整体正确率 0-100
+    grading_mode: Optional[str] = None       # ocr | vision
     results: list[GradingResult]
     created_at: datetime
 

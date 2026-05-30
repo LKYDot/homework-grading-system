@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { GradingResult } from '@/api/homework'
+import type { GradingResultItem } from '@/api/homework'
 
 const props = defineProps<{
-  item: GradingResult
+  item: GradingResultItem
 }>()
 
 const resultClass = computed(() => {
@@ -18,8 +18,15 @@ const resultIcon = computed(() => {
   return 'x'
 })
 
+const accuracy = computed(() => {
+  if (props.item.max_score > 0) {
+    return (props.item.score / props.item.max_score) * 100
+  }
+  return 0
+})
+
 const resultAriaLabel = computed(() => {
-  return `第${props.item.question_no}题，得分${props.item.score}分（满分${props.item.max_score}分），${props.item.result}`
+  return `第${props.item.question_no}题，${props.item.result}，得分${props.item.score}/${props.item.max_score}`
 })
 </script>
 
@@ -28,7 +35,6 @@ const resultAriaLabel = computed(() => {
     <div class="gc-header">
       <span class="gc-qno">第 {{ item.question_no }} 题</span>
       <div style="display:flex;align-items:center;gap:6px;">
-        <!-- result icon -->
         <svg v-if="resultIcon === 'check'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;color:var(--color-success);" aria-hidden="true">
           <polyline points="20 6 9 17 4 12"/>
         </svg>
@@ -39,17 +45,23 @@ const resultAriaLabel = computed(() => {
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
         <span class="gc-score">
-          {{ item.score }} <span class="gc-max">/ {{ item.max_score }}</span>
+          {{ item.result }}
+          <span class="gc-max">({{ item.score }}/{{ item.max_score }})</span>
         </span>
       </div>
     </div>
+    
+    <div v-if="item.question_text" class="gc-question">
+      <div class="gc-label">题目</div>
+      <div class="gc-text">{{ item.question_text }}</div>
+    </div>
+    
+    <div v-if="item.student_answer" class="gc-student-answer">
+      <div class="gc-label">学生答案</div>
+      <div class="gc-text">{{ item.student_answer }}</div>
+    </div>
+    
     <div v-if="item.comment" class="gc-comment">{{ item.comment }}</div>
     <div v-if="item.analysis" class="gc-analysis">{{ item.analysis }}</div>
-    <div v-if="item.confidence !== undefined" style="font-size:0.72rem;color:var(--color-text-muted);margin-top:8px;display:flex;align-items:center;gap:4px;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;" aria-hidden="true">
-        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-      </svg>
-      置信度: {{ (item.confidence * 100).toFixed(0) }}%
-    </div>
   </div>
 </template>

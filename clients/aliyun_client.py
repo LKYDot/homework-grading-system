@@ -1,4 +1,5 @@
 import json
+import re
 import socket
 from typing import Any, Dict, List
 
@@ -190,11 +191,11 @@ class AliyunOCRClient:
                 logger.warning("API未识别到题目，使用模拟数据")
                 questions = self._mock_paper_cut(image_path)
 
-            logger.info("试卷切题完成，共识别到%d道题" % len(questions))
+            logger.info("试卷切题完成，共识别到{}道题", len(questions))
             return questions
 
         except Exception as e:
-            logger.error("试卷切题失败: %s", str(e), exc_info=True)
+            logger.error("试卷切题失败: {}", str(e), exc_info=True)
             if "getaddrinfo" in str(e) or "Max retries" in str(e) or "timeout" in str(e).lower():
                 logger.warning("网络不可用，切换到mock模式")
                 self._network_available = False
@@ -270,7 +271,7 @@ class AliyunOCRClient:
                 return self._mock_question_ocr(image_path)
 
             question_text = data.get("QuestionText", "") or data.get("text", "") or data.get("content", "")
-            student_answer = data.get("AnswerText", "") or data.get("answer", "")
+            student_answer = data.get("AnswerText", "") or data.get("answer", "") or data.get("StudentAnswer", "")
             
             prism_words_info = data.get("prism_wordsInfo", [])
             if prism_words_info and isinstance(prism_words_info, list):
@@ -280,10 +281,21 @@ class AliyunOCRClient:
                     if not question_text:
                         question_text = text_from_words
 
+            if not question_text:
+                question_text = self._extract_text_from_words(prism_words_info)
+
+            if not student_answer:
+                student_answer = self._extract_student_answer(data, question_text)
+
+            question_type = data.get("QuestionType", "") or data.get("question_type", "")
+            if not question_type:
+                question_type = self._detect_question_type(question_text)
+                logger.debug(f"自动推断题型: {question_type}")
+
             ocr_result = {
                 "question_text": question_text.strip(),
                 "student_answer": student_answer.strip(),
-                "question_type": data.get("QuestionType", "") or data.get("question_type", ""),
+                "question_type": question_type,
                 "raw_response": data,
             }
 
@@ -291,12 +303,80 @@ class AliyunOCRClient:
             return ocr_result
 
         except Exception as e:
-            logger.error("题目OCR失败: %s", str(e), exc_info=True)
+            logger.opt(exception=True).error("题目OCR失败: {}", str(e))
             if "getaddrinfo" in str(e) or "Max retries" in str(e) or "timeout" in str(e).lower():
                 logger.warning("网络不可用，切换到mock模式")
                 self._network_available = False
                 return self._mock_question_ocr(image_path)
             raise
+
+    def _extract_text_from_words(self, words_info: list) -> str:
+        """从wordsInfo中提取文本"""
+        if not isinstance(words_info, list):
+            return ""
+        
+        words = []
+        for item in words_info:
+            if isinstance(item, dict):
+                word = item.get("word", "")
+                if word:
+                    words.append(word)
+            elif hasattr(item, 'word'):
+                words.append(str(getattr(item, 'word', '')))
+        
+        return " ".join(words)
+
+    def _extract_student_answer(self, data: dict, question_text: str) -> str:
+        """从OCR结果中提取学生答案
+
+        策略：
+        1. 优先从 prism_wordsInfo 中提取 recClassify=2 的手写内容
+        2. 若没有手写标记，从 content 中截取题干之后的部分
+        """
+        prism_info = data.get("prism_wordsInfo", [])
+        if isinstance(prism_info, list):
+            handwritten = [
+                item.get("word", "").strip()
+                for item in prism_info
+                if isinstance(item, dict) and item.get("recClassify") == 2
+            ]
+            if handwritten:
+                answer = " ".join(handwritten)
+                logger.debug(f"提取手写答案: {answer[:30]}...")
+                return answer
+
+        # fallback: 从 content 截取题干之后的内容
+        content = data.get("content", "") or data.get("text", "")
+        if content and question_text and len(content) > len(question_text) + 5:
+            idx = content.find(question_text)
+            if idx >= 0:
+                remaining = content[idx + len(question_text):].strip()
+                if remaining and len(remaining) < 200:
+                    return remaining
+
+        return ""
+
+    def _detect_question_type(self, content: str) -> str:
+        """从题目内容自动推断题型"""
+        if not content:
+            return "解答题"
+        text = content.strip()
+        # 选择题：有编号选项 A. B. C. D.
+        if re.search(r"[A-E][\.\、\s]", text) and re.search(r"[A-E]\.[^a-z]", text):
+            return "选择题"
+        # 判断题：含 对/错/正确/错误/√/×
+        if re.search(r"(正确|错误|对[\.\s]|错[\.\s]|[√×✓✗])", text):
+            return "判断题"
+        # 填空题：有下划线或明显留空
+        if re.search(r"[_＿]{2,}|\(\s*\)|（\s*）", text):
+            return "填空题"
+        # 计算/化简/求解题
+        if re.search(r"(计算|化简|求[解值]|解方程|解不等式|求值|简化|展开)", text):
+            return "计算题"
+        # 口算题
+        if re.search(r"(口算|直接写出得数|速算)", text):
+            return "口算题"
+        return "解答题"
 
     def _mock_paper_cut(self, image_path: str) -> List[Dict[str, Any]]:
         logger.info(f"使用mock模式进行试卷切题: {image_path}")

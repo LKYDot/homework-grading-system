@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useHomeworkStore } from '@/stores/homework'
 import GradingCard from '@/components/GradingCard.vue'
@@ -8,6 +8,14 @@ const route = useRoute()
 const homework = useHomeworkStore()
 const taskId = route.params.taskId as string
 const error = ref('')
+
+const totalQuestions = computed(() => {
+  return homework.currentResult?.results?.length || 0
+})
+
+const correctCount = computed(() => {
+  return homework.currentResult?.results?.filter(r => r.result === '正确').length || 0
+})
 
 onMounted(async () => {
   try {
@@ -35,17 +43,22 @@ onMounted(async () => {
       <div class="card" style="margin-bottom:20px;">
         <div class="result-summary">
           <div>
-            <div class="total-label">总分</div>
-            <div class="total-score">{{ homework.currentResult.total_score }}</div>
+            <div class="total-label">正确率</div>
+            <div class="total-score" :class="{ 'high': (homework.currentResult.accuracy || 0) >= 80, 'medium': (homework.currentResult.accuracy || 0) >= 60 && (homework.currentResult.accuracy || 0) < 80, 'low': (homework.currentResult.accuracy || 0) < 60 }">
+              {{ (homework.currentResult.accuracy ?? 0).toFixed(1) }}%
+            </div>
           </div>
           <div style="font-size:0.85rem;color:var(--color-text-secondary);">
-            共 {{ homework.currentResult.results.length }} 题
+            共 {{ totalQuestions }} 题，答对 {{ correctCount }} 题
+          </div>
+          <div style="font-size:0.85rem;color:var(--color-text-secondary);margin-top:4px;">
+            得分 {{ homework.currentResult.total_score }}/{{ homework.currentResult.total_max_score }}
           </div>
         </div>
       </div>
 
       <div class="grading-list" role="list" aria-label="题目批改结果">
-        <div v-for="r in homework.currentResult.results" :key="r.question_no" role="listitem">
+        <div v-for="r in homework.currentResult.results" :key="r.question_block_id" role="listitem">
           <GradingCard :item="r" />
         </div>
       </div>

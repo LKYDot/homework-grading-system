@@ -754,9 +754,20 @@ tr:hover td {
 .result-summary .total-score {
   font-size: 2.4rem;
   font-weight: 700;
-  color: var(--color-primary);
   line-height: 1.1;
   letter-spacing: -0.02em;
+}
+
+.result-summary .total-score.high {
+  color: var(--color-success);
+}
+
+.result-summary .total-score.medium {
+  color: var(--color-warning);
+}
+
+.result-summary .total-score.low {
+  color: var(--color-danger);
 }
 
 .result-summary .total-label {
@@ -827,6 +838,29 @@ tr:hover td {
   border-radius: var(--radius-sm);
 }
 
+.grading-card .gc-question,
+.grading-card .gc-student-answer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.grading-card .gc-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.grading-card .gc-text {
+  font-size: 0.85rem;
+  color: var(--color-text);
+  line-height: 1.6;
+  word-break: break-word;
+}
+
 .result-correct {
   border-left: 3px solid var(--color-success);
 }
@@ -844,6 +878,61 @@ tr:hover td {
 }
 
 .result-incorrect .gc-score { color: var(--color-danger); }
+
+/* ── radio group ── */
+.radio-group {
+  display: flex;
+  gap: 16px;
+}
+
+.radio-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast);
+}
+
+.radio-item:hover {
+  background: var(--color-bg);
+}
+
+.radio-item input[type="radio"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border);
+  border-radius: 50%;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  transition: border-color var(--transition-fast);
+}
+
+.radio-item input[type="radio"]:checked {
+  border-color: var(--color-primary);
+}
+
+.radio-item input[type="radio"]:checked::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background: var(--color-primary);
+  border-radius: 50%;
+}
+
+.radio-item span {
+  font-weight: 500;
+}
 
 /* ═══════════════════════════════════════
    Misc
