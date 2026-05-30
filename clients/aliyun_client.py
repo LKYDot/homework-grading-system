@@ -102,17 +102,23 @@ class AliyunOCRClient:
             try:
                 if hasattr(body, '__dict__'):
                     body_dict = vars(body)
-            except Exception:
-                pass
+                elif isinstance(body, dict):
+                    body_dict = body
+            except Exception as e:
+                logger.error(f"获取响应体字典失败: {str(e)}")
             
-            logger.debug(f"API响应体: {body_dict}")
+            logger.debug(f"API响应体类型: {type(body)}")
+            logger.debug(f"API响应体: {str(body)[:500]}")
+            logger.debug(f"API响应体字典: {body_dict}")
             
             code = getattr(body, 'code', None)
+            request_id = getattr(body, 'request_id', None) or getattr(body, 'RequestId', None)
+            
             if code is not None and code != "OK":
                 error_msg = getattr(body, 'message', '未知错误')
                 if error_msg is None:
                     error_msg = str(body)
-                logger.error(f"试卷切题API返回错误: {code}, 消息: {error_msg}")
+                logger.error(f"试卷切题API返回错误: {code}, 消息: {error_msg}, RequestId: {request_id}")
                 return self._mock_paper_cut(image_path)
 
             data = getattr(body, 'data', None)
@@ -121,7 +127,7 @@ class AliyunOCRClient:
                 data = body_dict.get('Data', None)
             
             if data is None:
-                logger.error("试卷切题API返回空数据")
+                logger.error(f"试卷切题API返回空数据, RequestId: {request_id}")
                 return self._mock_paper_cut(image_path)
 
             logger.debug(f"响应数据类型: {type(data)}, 内容长度: {len(str(data)) if data else 0}")
@@ -200,7 +206,8 @@ class AliyunOCRClient:
                 logger.warning("网络不可用，切换到mock模式")
                 self._network_available = False
                 return self._mock_paper_cut(image_path)
-            raise
+            logger.warning("OCR API调用失败，降级到mock模式")
+            return self._mock_paper_cut(image_path)
 
     def recognize_edu_question_ocr(self, image_path: str) -> Dict[str, Any]:
         """调用阿里云题目OCR接口"""
@@ -308,7 +315,8 @@ class AliyunOCRClient:
                 logger.warning("网络不可用，切换到mock模式")
                 self._network_available = False
                 return self._mock_question_ocr(image_path)
-            raise
+            logger.warning("题目OCR API调用失败，降级到mock模式")
+            return self._mock_question_ocr(image_path)
 
     def _extract_text_from_words(self, words_info: list) -> str:
         """从wordsInfo中提取文本"""

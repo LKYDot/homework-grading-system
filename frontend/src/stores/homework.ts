@@ -36,50 +36,48 @@ export const useHomeworkStore = defineStore('homework', () => {
   }
 
   async function upload(file: File, subject: string, grade: string, model?: string) {
-    const form = new FormData()
-    form.append('file', file)
-    form.append('subject', subject)
-    form.append('grade', grade)
-    if (model) {
-      form.append('model', model)
+        const form = new FormData()
+        form.append('file', file)
+        form.append('subject', subject)
+        form.append('grade', grade)
+        if (model) {
+            form.append('model', model)
+        }
+        const { data } = await homeworkApi.upload(form)
+        const task: TaskItem = {
+            task_id: data.data.task_id,
+            status: 'PENDING',
+            subject,
+            accuracy: 0,
+            created_at: new Date().toISOString(),
+            questions: [],
+            question_count: 0,
+        }
+        tasks.value.unshift(task)
+        return data.data.task_id
     }
-    const { data } = await homeworkApi.upload(form)
-    const task: TaskItem = {
-      task_id: data.data.task_id,
-      status: 'PENDING',
-      subject,
-      grade,
-      total_score: 0,
-      total_max_score: 0,
-      accuracy: 0,
-      created_at: new Date().toISOString(),
-    }
-    tasks.value.unshift(task)
-    return data.data.task_id
-  }
 
-  async function analyze(file: File, subject: string, grade: string, model?: string) {
-    const form = new FormData()
-    form.append('file', file)
-    form.append('subject', subject)
-    form.append('grade', grade)
-    if (model) {
-      form.append('model', model)
+    async function analyze(file: File, subject: string, grade: string, model?: string) {
+        const form = new FormData()
+        form.append('file', file)
+        form.append('subject', subject)
+        form.append('grade', grade)
+        if (model) {
+            form.append('model', model)
+        }
+        const { data } = await homeworkApi.analyze(form)
+        const task: TaskItem = {
+            task_id: data.data.task_id,
+            status: 'PENDING',
+            subject,
+            accuracy: 0,
+            created_at: new Date().toISOString(),
+            questions: [],
+            question_count: 0,
+        }
+        tasks.value.unshift(task)
+        return data.data.task_id
     }
-    const { data } = await homeworkApi.analyze(form)
-    const task: TaskItem = {
-      task_id: data.data.task_id,
-      status: 'PENDING',
-      subject,
-      grade,
-      total_score: 0,
-      total_max_score: 0,
-      accuracy: 0,
-      created_at: new Date().toISOString(),
-    }
-    tasks.value.unshift(task)
-    return data.data.task_id
-  }
 
   async function pollStatus(taskId: string): Promise<TaskStatusResponse> {
     const { data } = await homeworkApi.getStatus(taskId)
@@ -98,8 +96,6 @@ export const useHomeworkStore = defineStore('homework', () => {
       const t = tasks.value.find((x) => x.task_id === taskId)
       if (t && currentResult.value) {
         t.status = 'SUCCESS'
-        t.total_score = currentResult.value.total_score
-        t.total_max_score = currentResult.value.total_max_score
         t.accuracy = currentResult.value.accuracy
       }
     } finally {

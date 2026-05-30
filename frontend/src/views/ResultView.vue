@@ -51,9 +51,6 @@ onMounted(async () => {
           <div style="font-size:0.85rem;color:var(--color-text-secondary);">
             共 {{ totalQuestions }} 题，答对 {{ correctCount }} 题
           </div>
-          <div style="font-size:0.85rem;color:var(--color-text-secondary);margin-top:4px;">
-            得分 {{ homework.currentResult.total_score }}/{{ homework.currentResult.total_max_score }}
-          </div>
         </div>
       </div>
 

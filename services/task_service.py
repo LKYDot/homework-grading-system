@@ -194,13 +194,11 @@ class TaskService:
                 .all()
             )
             
-            total_max_score = 0
             accuracy_sum = 0
             accuracy_count = 0
             
             questions = []
             for gr in grading_results:
-                total_max_score += float(gr.max_score) if gr.max_score else 0
                 if gr.accuracy is not None:
                     accuracy_sum += float(gr.accuracy)
                     accuracy_count += 1
@@ -208,8 +206,7 @@ class TaskService:
                 questions.append({
                     "question_no": gr.question_no,
                     "question_text": gr.analysis[:50] + "..." if gr.analysis and len(gr.analysis) > 50 else (gr.analysis or ""),
-                    "score": float(gr.score) if gr.score else 0,
-                    "max_score": float(gr.max_score) if gr.max_score else 0,
+                    "accuracy": float(gr.accuracy) if gr.accuracy else 0,
                     "result": gr.result,
                 })
             
@@ -220,8 +217,6 @@ class TaskService:
                     "task_id": task.task_id,
                     "subject": task.subject,
                     "status": task.status,
-                    "total_score": float(task.total_score) if task.total_score else 0,
-                    "total_max_score": total_max_score,
                     "accuracy": accuracy,
                     "created_at": task.created_at,
                     "questions": questions,

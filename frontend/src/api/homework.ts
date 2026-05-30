@@ -34,8 +34,7 @@ export interface GradingResultResponse {
 export interface QuestionSummary {
   question_no: string
   question_text: string
-  score: number
-  max_score: number
+  accuracy: number
   result: string
 }
 
@@ -43,8 +42,6 @@ export interface TaskItem {
   task_id: string
   subject: string
   status: string
-  total_score: number
-  total_max_score: number
   accuracy: number
   created_at: string
   questions: QuestionSummary[]

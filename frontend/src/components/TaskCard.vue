@@ -43,19 +43,18 @@ const gradeLabel: Record<string, string> = {
     class="task-item"
     role="button"
     tabindex="0"
-    :aria-label="`任务 ${task.task_id}，${subjectLabel[task.subject] || task.subject} ${gradeLabel[task.grade] || task.grade}，状态 ${statusLabel}`"
+    :aria-label="`任务 ${task.task_id}，${subjectLabel[task.subject] || task.subject}，状态 ${statusLabel}`"
     @keydown.enter="$emit('click')"
     @keydown.space.prevent="$emit('click')"
   >
     <div class="task-info">
       <div class="task-meta">
         <span>{{ subjectLabel[task.subject] || task.subject }}</span>
-        <span>{{ gradeLabel[task.grade] || task.grade }}</span>
       </div>
       <div class="task-id">{{ task.task_id }}</div>
       <div v-if="task.status === 'SUCCESS'" class="task-score">
         <span :class="accuracyClass">正确率 {{ (task.accuracy ?? 0).toFixed(1) }}%</span>
-        <span>得分 {{ task.total_score || 0 }}/{{ task.total_max_score || 0 }}</span>
+        <span>{{ task.question_count }} 道题</span>
       </div>
     </div>
     <span class="badge" :class="'badge-' + task.status.toLowerCase().split(' ')[0]" role="status">
