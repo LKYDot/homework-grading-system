@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 from contextlib import asynccontextmanager
 from config import settings
-from app.v1 import homework, user, statistics, answers
+from app.v1 import homework, user, statistics, answers, models
 from utils.database import create_tables, SessionLocal
 from utils.seed_data import check_standard_answers
 from utils.logger import logger
@@ -76,6 +76,7 @@ app.include_router(homework.router, prefix="/api/v1")
 app.include_router(user.router, prefix="/api/v1")
 app.include_router(statistics.router, prefix="/api/v1")
 app.include_router(answers.router, prefix="/api/v1")
+app.include_router(models.router, prefix="/api/v1")
 
 
 @app.get("/")
@@ -95,20 +96,6 @@ async def health_check():
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
     }
-
-
-@app.get("/api/v1/models")
-async def list_models():
-    """获取可用模型列表"""
-    from schemas.model import ModelInfo, ModelsResponse
-    models_list = [
-        ModelInfo(
-            name=m.name, provider=m.provider, type=m.type,
-            model_id=m.model_id, enabled=m.enabled,
-        )
-        for m in settings.parsed_models
-    ]
-    return {"code": 200, "message": "success", "data": ModelsResponse(models=models_list).model_dump()}
 
 
 @app.get("/api/v1/config")

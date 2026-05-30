@@ -37,3 +37,8 @@ class AnalyzeResponse(BaseModel):
     task_id: str
     questions: List[AnalyzeResult]
     mode: str  # ocr | vision
+
+
+class ModelToggleRequest(BaseModel):
+    """模型启用/禁用请求"""
+    enabled: bool

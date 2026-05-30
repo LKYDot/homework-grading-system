@@ -17,7 +17,6 @@ BaseModel
 class UserBase(BaseModel):
     username: str
     email: EmailStr
-    full_name: Optional[str] = None
     role: str = "student"
 
 
@@ -27,9 +26,7 @@ class UserCreate(UserBase):
 
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
-    full_name: Optional[str] = None
     password: Optional[str] = None
-
 
 class UserResponse(UserBase):
     id: int

@@ -174,14 +174,17 @@ class TaskService:
             "created_at": task.created_at,
         }
 
-    def get_homework_list(self, db, skip: int = 0, limit: int = 20):
-        tasks = (
-            db.query(HomeworkTask)
-            .order_by(HomeworkTask.created_at.desc())
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+    def get_homework_list(self, db, skip: int = 0, limit: int = 20, subject: Optional[str] = None, grade: Optional[str] = None, status: Optional[str] = None):
+        query = db.query(HomeworkTask).order_by(HomeworkTask.created_at.desc())
+        
+        if subject:
+            query = query.filter(HomeworkTask.subject == subject)
+        if grade:
+            query = query.filter(HomeworkTask.grade == grade)
+        if status:
+            query = query.filter(HomeworkTask.status == status)
+        
+        tasks = query.offset(skip).limit(limit).all()
 
         result = []
         for task in tasks:
@@ -195,11 +198,20 @@ class TaskService:
             accuracy_sum = 0
             accuracy_count = 0
             
+            questions = []
             for gr in grading_results:
                 total_max_score += float(gr.max_score) if gr.max_score else 0
                 if gr.accuracy is not None:
                     accuracy_sum += float(gr.accuracy)
                     accuracy_count += 1
+                
+                questions.append({
+                    "question_no": gr.question_no,
+                    "question_text": gr.analysis[:50] + "..." if gr.analysis and len(gr.analysis) > 50 else (gr.analysis or ""),
+                    "score": float(gr.score) if gr.score else 0,
+                    "max_score": float(gr.max_score) if gr.max_score else 0,
+                    "result": gr.result,
+                })
             
             accuracy = round(accuracy_sum / accuracy_count, 1) if accuracy_count > 0 else 0
 
@@ -207,19 +219,39 @@ class TaskService:
                 {
                     "task_id": task.task_id,
                     "subject": task.subject,
-                    "grade": task.grade,
                     "status": task.status,
                     "total_score": float(task.total_score) if task.total_score else 0,
                     "total_max_score": total_max_score,
                     "accuracy": accuracy,
                     "created_at": task.created_at,
+                    "questions": questions,
+                    "question_count": len(questions),
                 }
             )
 
         return result
 
-    def get_homework_count(self, db) -> int:
-        return db.query(HomeworkTask).count()
+    def get_homework_count(self, db, subject: Optional[str] = None, grade: Optional[str] = None, status: Optional[str] = None) -> int:
+        query = db.query(HomeworkTask)
+        
+        if subject:
+            query = query.filter(HomeworkTask.subject == subject)
+        if grade:
+            query = query.filter(HomeworkTask.grade == grade)
+        if status:
+            query = query.filter(HomeworkTask.status == status)
+        
+        return query.count()
+
+    def delete_task(self, db: Session, task_id: str):
+        """删除任务及其相关数据"""
+        db.query(GradingResultModel).filter(GradingResultModel.task_id == task_id).delete()
+        db.query(OCRResult).filter(OCRResult.task_id == task_id).delete()
+        db.query(QuestionBlock).filter(QuestionBlock.task_id == task_id).delete()
+        db.query(HomeworkImage).filter(HomeworkImage.task_id == task_id).delete()
+        db.query(HomeworkTask).filter(HomeworkTask.task_id == task_id).delete()
+        db.commit()
+        logger.info(f"删除任务: {task_id}")
 
 
     def match_standard_answer(

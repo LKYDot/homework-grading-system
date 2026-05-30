@@ -183,13 +183,16 @@ async def get_grading_result(task_id: str, db: Session = Depends(get_db)):
 async def get_homework_list(
     page: int = 1,
     page_size: int = 20,
+    subject: Optional[str] = None,
+    grade: Optional[str] = None,
+    status: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     """获取作业列表（分页）"""
     try:
         skip = (page - 1) * page_size
-        tasks = task_service.get_homework_list(db, skip=skip, limit=page_size)
-        total = task_service.get_homework_count(db)
+        tasks = task_service.get_homework_list(db, skip=skip, limit=page_size, subject=subject, grade=grade, status=status)
+        total = task_service.get_homework_count(db, subject=subject, grade=grade, status=status)
         
         return APIResponse(data={
             "items": tasks,
@@ -202,3 +205,138 @@ async def get_homework_list(
     except Exception as e:
         logger.opt(exception=True).error("获取作业列表失败: {}", str(e))
         raise HTTPException(status_code=500, detail="获取作业列表失败")
+
+
+@router.delete("/{task_id}", response_model=APIResponse)
+async def delete_homework(task_id: str, db: Session = Depends(get_db)):
+    """删除单个作业任务"""
+    try:
+        task = task_service.get_task_by_id(db, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="任务不存在")
+        
+        task_service.delete_task(db, task_id)
+        logger.info(f"任务已删除: {task_id}")
+        return APIResponse(data={"task_id": task_id})
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.opt(exception=True).error("删除任务失败: {}", str(e))
+        raise HTTPException(status_code=500, detail="删除任务失败")
+
+
+@router.post("/batch/delete", response_model=APIResponse)
+async def batch_delete_homework(task_ids: List[str] = Form(...), db: Session = Depends(get_db)):
+    """批量删除作业任务"""
+    try:
+        success_count = 0
+        failed_count = 0
+        
+        for task_id in task_ids:
+            try:
+                task = task_service.get_task_by_id(db, task_id)
+                if task:
+                    task_service.delete_task(db, task_id)
+                    success_count += 1
+                else:
+                    failed_count += 1
+            except:
+                failed_count += 1
+        
+        logger.info(f"批量删除完成: 成功{success_count}个, 失败{failed_count}个")
+        return APIResponse(data={"success_count": success_count, "failed_count": failed_count})
+    
+    except Exception as e:
+        logger.opt(exception=True).error("批量删除失败: {}", str(e))
+        raise HTTPException(status_code=500, detail="批量删除失败")
+
+
+@router.post("/{task_id}/cancel", response_model=APIResponse)
+async def cancel_task(task_id: str, db: Session = Depends(get_db)):
+    """取消正在处理的任务"""
+    try:
+        task = task_service.get_task_by_id(db, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="任务不存在")
+        
+        if task.status in ["PENDING", "PROCESSING", "GRADING"]:
+            task_service.update_task_status(db, task_id, "CANCELLED")
+            logger.info(f"任务已取消: {task_id}")
+            return APIResponse(data={"task_id": task_id, "status": "CANCELLED"})
+        else:
+            raise HTTPException(status_code=400, detail="只有待处理或处理中的任务才能取消")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.opt(exception=True).error("取消任务失败: {}", str(e))
+        raise HTTPException(status_code=500, detail="取消任务失败")
+
+
+@router.get("/subjects")
+async def get_subjects():
+    """获取支持的科目列表"""
+    subjects = ["math", "chinese", "english", "physics", "chemistry", "biology", "history", "geography"]
+    subject_names = {
+        "math": "数学",
+        "chinese": "语文",
+        "english": "英语",
+        "physics": "物理",
+        "chemistry": "化学",
+        "biology": "生物",
+        "history": "历史",
+        "geography": "地理",
+    }
+    
+    return {
+        "code": 200,
+        "message": "success",
+        "data": [
+            {"code": s, "name": subject_names[s]} for s in subjects
+        ]
+    }
+
+
+@router.get("/grades")
+async def get_grades():
+    """获取支持的年级列表"""
+    grades = ["grade1", "grade2", "grade3", "grade4", "grade5", "grade6", "grade7", "grade8", "grade9"]
+    grade_names = {
+        "grade1": "一年级",
+        "grade2": "二年级",
+        "grade3": "三年级",
+        "grade4": "四年级",
+        "grade5": "五年级",
+        "grade6": "六年级",
+        "grade7": "初一",
+        "grade8": "初二",
+        "grade9": "初三",
+    }
+    
+    return {
+        "code": 200,
+        "message": "success",
+        "data": [
+            {"code": g, "name": grade_names[g]} for g in grades
+        ]
+    }
+
+
+@router.get("/statuses")
+async def get_statuses():
+    """获取任务状态列表及说明"""
+    statuses = [
+        {"code": "PENDING", "name": "待处理", "description": "任务已创建，等待处理"},
+        {"code": "PROCESSING", "name": "处理中", "description": "正在进行题目识别"},
+        {"code": "GRADING", "name": "批改中", "description": "正在进行智能批改"},
+        {"code": "SUCCESS", "name": "已完成", "description": "批改完成"},
+        {"code": "FAILED", "name": "失败", "description": "处理失败"},
+        {"code": "CANCELLED", "name": "已取消", "description": "任务已取消"},
+    ]
+    
+    return {
+        "code": 200,
+        "message": "success",
+        "data": statuses
+    }
