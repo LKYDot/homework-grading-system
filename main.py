@@ -22,7 +22,7 @@ async def app_lifespan(app: FastAPI):
         db.close()
 
     # 检查大模型配置
-    models = settings.parsed_models
+    model_list = settings.parsed_models
     if settings.is_llm_enabled:
         names = [m.name for m in settings.text_models]
         logger.info(f"大模型已启用: text_models={names}, grading_mode={settings.GRADING_MODE}")

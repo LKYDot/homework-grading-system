@@ -90,6 +90,24 @@ class TaskService:
         ):
             block["id"] = question_block.id
 
+    def save_question_blocks_raw(
+        self, db: Session, task_id: str, question_blocks: list, image_path: str
+    ):
+        """保存切题原始坐标（不裁剪图片，用于前端预览）"""
+        from services.image_service import image_service
+
+        cropped = image_service.crop_question_blocks(image_path, question_blocks)
+        for i, block in enumerate(cropped):
+            qb = QuestionBlock(
+                task_id=task_id,
+                question_no=block.get("question_no", str(i + 1)),
+                question_image_url=block["image_path"],
+                x1=block["x1"], y1=block["y1"],
+                x2=block["x2"], y2=block["y2"],
+            )
+            db.add(qb)
+        db.commit()
+
     def save_ocr_results(self, db: Session, task_id: str, ocr_results: List[dict]):
         for ocr_result in ocr_results:
             ocr = OCRResult(

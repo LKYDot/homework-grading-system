@@ -1,3 +1,5 @@
+import json
+import os
 from celery_app import celery_app
 from services.image_service import image_service
 from clients.aliyun_client import aliyun_ocr_client
@@ -126,6 +128,53 @@ def _vision_pipeline(image_path, db, task_id, model_name=None):
     return total_score, grading_results
 
 
+def _ocr_pipeline_from_blocks(image_path, db, task_id, selected_indices=""):
+    """使用已保存的切题区域进行 OCR（跳过 paper cut 步骤）"""
+    from models.homework import QuestionBlock
+
+    task_service.update_task_status(db, task_id, "OCRING")
+
+    all_blocks = (
+        db.query(QuestionBlock)
+        .filter(QuestionBlock.task_id == task_id)
+        .order_by(QuestionBlock.id)
+        .all()
+    )
+
+    # 筛选选中的区域
+    if selected_indices:
+        try:
+            indices = json.loads(selected_indices)
+            blocks = [all_blocks[i] for i in indices if i < len(all_blocks)]
+            logger.info(f"使用选中区域: {indices}, 共 {len(blocks)} 块")
+        except Exception:
+            blocks = all_blocks
+    else:
+        blocks = all_blocks
+
+    from services.image_service import image_service
+
+    ocr_results = []
+    for b in blocks:
+        if b.question_image_url and os.path.exists(b.question_image_url):
+            img_path = b.question_image_url
+        else:
+            img_path = image_path
+
+        enhanced_path = image_service.enhance_for_ocr(img_path)
+        ocr = aliyun_ocr_client.recognize_edu_question_ocr(enhanced_path)
+
+        if not ocr.get("question_text"):
+            ocr = aliyun_ocr_client.recognize_edu_question_ocr(img_path)
+
+        ocr["question_block_id"] = b.id
+        ocr["question_no"] = b.question_no
+        ocr_results.append(ocr)
+
+    task_service.save_ocr_results(db, task_id, ocr_results)
+    return ocr_results
+
+
 def _grading_loop(ocr_results, db, task_id, model_name, subject="", grade=""):
     """逐题批改：优先查标准答案，有标答用标答参考批改，无标答让 LLM 直接解题"""
     task_service.update_task_status(db, task_id, "GRADING")
@@ -232,8 +281,9 @@ def process_homework_task(
 def process_analyze_task(
     self, task_id: str, image_path: str, subject: str, grade: str,
     user_id: int, grading_mode: str = "ocr", model_name: str = None,
+    selected_indices: str = "",
 ):
-    """分析并批改作业（使用大模型直接分析）"""
+    """分析并批改作业"""
     db = SessionLocal()
     try:
         task_service.update_task_status(db, task_id, "PROCESSING")
@@ -243,7 +293,7 @@ def process_analyze_task(
         if grading_mode == "vision":
             total_score, _ = _vision_pipeline(image_path, db, task_id, model_name)
         else:
-            ocr_results = _ocr_pipeline(image_path, db, task_id)
+            ocr_results = _ocr_pipeline_from_blocks(image_path, db, task_id, selected_indices)
             total_score, _ = _grading_loop(ocr_results, db, task_id, model_name, subject, grade)
 
         task_service.update_task_status(db, task_id, "SUCCESS")

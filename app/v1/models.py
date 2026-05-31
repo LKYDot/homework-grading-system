@@ -6,22 +6,76 @@ from utils.logger import logger
 router = APIRouter(prefix="/models", tags=["模型管理"])
 
 
-@router.get("", response_model=ModelsResponse)
+@router.get("")
 async def list_models():
     """获取所有可用模型列表"""
     models_list = [
-        ModelInfo(
-            name=m.name, 
-            provider=m.provider, 
-            type=m.type,
-            model_id=m.model_id, 
-            enabled=m.enabled,
-            max_tokens=m.max_tokens,
-            temperature=m.temperature,
-        )
+        {
+            "name": m.name, 
+            "provider": m.provider, 
+            "type": m.type,
+            "model_id": m.model_id, 
+            "enabled": m.enabled,
+            "max_tokens": m.max_tokens,
+            "temperature": m.temperature,
+        }
         for m in settings.parsed_models
     ]
-    return ModelsResponse(models=models_list)
+    return {
+        "code": 200,
+        "message": "success",
+        "data": {"models": models_list},
+    }
+
+
+@router.get("/stats")
+async def get_models_stats():
+    """获取模型统计信息"""
+    all_models = settings.parsed_models
+    text_count = len([m for m in all_models if m.type == "text"])
+    vision_count = len([m for m in all_models if m.type == "vision"])
+    enabled_count = len([m for m in all_models if m.enabled])
+    
+    return {
+        "code": 200,
+        "message": "success",
+        "data": {
+            "total": len(all_models),
+            "text_count": text_count,
+            "vision_count": vision_count,
+            "enabled_count": enabled_count,
+            "disabled_count": len(all_models) - enabled_count,
+        }
+    }
+
+
+@router.get("/types/{model_type}")
+async def list_models_by_type(model_type: str):
+    """按类型获取模型列表"""
+    if model_type not in ["text", "vision"]:
+        raise HTTPException(status_code=400, detail="无效的模型类型")
+    
+    models_list = [
+        {
+            "name": m.name, 
+            "provider": m.provider, 
+            "type": m.type,
+            "model_id": m.model_id, 
+            "enabled": m.enabled,
+        }
+        for m in settings.parsed_models 
+        if m.type == model_type and m.enabled
+    ]
+    
+    return {
+        "code": 200,
+        "message": "success",
+        "data": {
+            "models": models_list,
+            "type": model_type,
+            "count": len(models_list),
+        }
+    }
 
 
 @router.get("/{model_name}")
@@ -63,55 +117,5 @@ async def toggle_model(model_name: str, request: ModelToggleRequest):
         "data": {
             "name": model.name,
             "enabled": model.enabled,
-        }
-    }
-
-
-@router.get("/types/{model_type}")
-async def list_models_by_type(model_type: str):
-    """按类型获取模型列表"""
-    if model_type not in ["text", "vision"]:
-        raise HTTPException(status_code=400, detail="无效的模型类型")
-    
-    models_list = [
-        ModelInfo(
-            name=m.name, 
-            provider=m.provider, 
-            type=m.type,
-            model_id=m.model_id, 
-            enabled=m.enabled,
-        )
-        for m in settings.parsed_models 
-        if m.type == model_type and m.enabled
-    ]
-    
-    return {
-        "code": 200,
-        "message": "success",
-        "data": {
-            "models": models_list,
-            "type": model_type,
-            "count": len(models_list),
-        }
-    }
-
-
-@router.get("/stats")
-async def get_models_stats():
-    """获取模型统计信息"""
-    all_models = settings.parsed_models
-    text_count = len([m for m in all_models if m.type == "text"])
-    vision_count = len([m for m in all_models if m.type == "vision"])
-    enabled_count = len([m for m in all_models if m.enabled])
-    
-    return {
-        "code": 200,
-        "message": "success",
-        "data": {
-            "total": len(all_models),
-            "text_count": text_count,
-            "vision_count": vision_count,
-            "enabled_count": enabled_count,
-            "disabled_count": len(all_models) - enabled_count,
         }
     }
