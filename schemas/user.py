@@ -28,6 +28,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = None
 
+
 class UserResponse(UserBase):
     id: int
     is_active: bool
@@ -38,7 +39,7 @@ class UserResponse(UserBase):
 
 
 class LoginRequest(BaseModel):
-    username: str
+    email: EmailStr
     password: str
 
 

@@ -53,15 +53,15 @@ async def login_user(login: LoginRequest, db: Session = Depends(get_db)):
     """用户登录"""
     try:
         # 查找用户
-        user = db.query(User).filter(User.username == login.username).first()
+        user = db.query(User).filter(User.email == login.email).first()
         if not user:
-            raise HTTPException(status_code=401, detail="用户名或密码错误")
+            raise HTTPException(status_code=401, detail="邮箱或密码错误")
         if not user.is_active:
             raise HTTPException(status_code=401, detail="用户因违规已被禁用")
 
         # 验证密码
         if not verify_password(login.password, user.hashed_password):
-            raise HTTPException(status_code=401, detail="用户名或密码错误")
+            raise HTTPException(status_code=401, detail="邮箱或密码错误")
 
         # 生成token
         access_token = create_access_token(

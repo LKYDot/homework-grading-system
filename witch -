@@ -1,0 +1,23 @@
+[33m5dabdc8[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m HEAD@{0}: commit: none
+[33mb502ab2[m HEAD@{1}: commit: trash: 好多bug，改不动了
+[33m476b427[m HEAD@{2}: commit: feat：添加切题区域接口
+[33m9f446f4[m HEAD@{3}: commit: feat: 优化
+[33m3c4b1fb[m HEAD@{4}: commit: feat: 优化
+[33m6cedec0[m HEAD@{5}: commit: feat: 可以批改，前后端可以合并了
+[33m81204d7[m HEAD@{6}: commit: feat: 可以批改，前后端可以合并了
+[33m54ba3f8[m HEAD@{7}: commit: feat: 更新README
+[33m93d4366[m HEAD@{8}: commit: feat: 更新readme
+[33m4c544b4[m HEAD@{9}: pull --tags origin main: Merge made by the 'ort' strategy.
+[33mf4fff19[m HEAD@{10}: commit: feat: 修复部分OCR功能，更新接口文档，以及需要修改的接口在文档结尾
+[33m92c58a1[m HEAD@{11}: commit: feat: none
+[33mfe6b308[m HEAD@{12}: commit: feat: 写了一个简陋的前端
+[33m1af51ba[m HEAD@{13}: commit: feat: 登录接口测试
+[33m8072b3f[m HEAD@{14}: commit: 修复celery错误
+[33me9a987e[m HEAD@{15}: commit: chore: remove Python cache files
+[33m98ae474[m HEAD@{16}: commit: none: none
+[33me8a43b7[m HEAD@{17}: commit: feat: 使用更新的SQLAlchemy语法,类型提示更准确
+[33mb8342dc[m HEAD@{18}: commit: feat: 清理冗余文件
+[33mdf22b24[m HEAD@{19}: commit: feat: 作业智能批改系统需求文档
+[33m41e6c28[m HEAD@{20}: commit: chore: 清理冗余文件和敏感配置
+[33m1793bbe[m HEAD@{21}: commit: chore: 清理冗余文件和敏感配置
+[33m08d7604[m HEAD@{22}: commit (initial): feat: 作业智能批改系统demo
